@@ -1,6 +1,4 @@
-# ==============================
-# General
-# ==============================
+# ===== General =====
 *.class
 *.log
 *.pyc
@@ -8,96 +6,57 @@
 *.lock
 .DS_Store
 .env
-.atom/
-.build/
-.buildlog/
-.history
 .svn/
-.swiftpm/
-migrate_working_dir/
+.history
 
-# ==============================
-# IDE
-# ==============================
+# ===== IDE =====
 *.iml
 *.ipr
 *.iws
 .idea/
-.vscode/         # nếu bạn muốn share config VSCode thì comment lại
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# .vscode/  # comment nếu muốn share setting VSCode
 
-# ==============================
-# Flutter / Dart / Pub
-# ==============================
+# ===== Flutter / Dart / Pub =====
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
 .pub-cache/
 .pub/
-/build/
-**/doc/api/
+build/
 coverage/
+**/doc/api/
 
-# ==============================
-# Android
-# ==============================
-**/android/.gradle/
-**/android/local.properties
-**/android/key.properties
-**/android/**/GeneratedPluginRegistrant.java
-**/android/app/debug
-**/android/app/profile
-**/android/app/release
+# ===== Android =====
+android/.gradle/
+android/local.properties
+android/key.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+**/GeneratedPluginRegistrant.java
 
-# Keystore files (bảo mật, không commit!)
+# Keystore/secret
 *.jks
 *.keystore
 
-# ==============================
-# iOS / macOS
-# ==============================
-**/ios/Flutter/.last_build_id
-**/ios/Flutter/Flutter.framework
-**/ios/Flutter/Flutter.podspec
-**/ios/ServiceDefinitions.json
-**/ios/Runner/GeneratedPluginRegistrant.*
+# ===== iOS =====
+ios/Flutter/.last_build_id
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
 
-**/macos/Flutter/GeneratedPluginRegistrant.swift
-**/macos/Flutter/ephemeral/
-
-# Xcode
-**/ios/Pods/
-**/ios/Podfile.lock
-**/ios/Runner.xcworkspace/
-**/ios/DerivedData/
+# Xcode junk
+ios/Pods/
+ios/DerivedData/
 *.xcuserstate
 *.xcscmblueprint
 *.xccheckout
-*.xcodeproj/project.xcworkspace/
-*.xcodeproj/xcuserdata/
+*.xcworkspace/           # workspace người dùng
+**/*.xcworkspace/xcuserdata/
+**/*.xcodeproj/xcuserdata/
 
-# ==============================
-# Windows
-# ==============================
-**/windows/flutter/ephemeral/
-
-# ==============================
-# Linux
-# ==============================
-**/linux/flutter/ephemeral/
-
-# ==============================
-# Web
-# ==============================
-**/web/manifest.json
-
-# ==============================
-# Symbolication & Obfuscation
-# ==============================
+# ===== Symbolication & Obfuscation =====
 app.*.symbols
 app.*.map.json

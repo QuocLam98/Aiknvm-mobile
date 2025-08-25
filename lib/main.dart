@@ -5,9 +5,9 @@ import 'routes.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await AuthRepository.init();                     // init storage/session
-  final auth = AuthController(AuthRepository());   // tạo controller
-  runApp(MyApp(auth: auth));                       // truyền vào MyApp (KHÔNG const)
+  await AuthRepository.init();
+  final auth = AuthController(AuthRepository());
+  runApp(MyApp(auth: auth));
 }
 
 class MyApp extends StatelessWidget {

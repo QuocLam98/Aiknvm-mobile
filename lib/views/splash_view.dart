@@ -1,44 +1,38 @@
 import 'package:flutter/material.dart';
-import 'package:aiknvm/services/auth_service.dart';
-import 'package:aiknvm/views/chat_view.dart';
-import 'package:aiknvm/views/login_view.dart';
+import '../controllers/auth_controller.dart';
+
 
 class SplashView extends StatefulWidget {
-  const SplashView({super.key});
+  final AuthController auth;
+  const SplashView({super.key, required this.auth});
+
 
   @override
   State<SplashView> createState() => _SplashViewState();
 }
 
-class _SplashViewState extends State<SplashView> {
-  final _auth = AuthService();
 
+class _SplashViewState extends State<SplashView> {
   @override
   void initState() {
     super.initState();
-    _bootstrap();
+    _boot();
   }
 
-  Future<void> _bootstrap() async {
-    final ok = await _auth.hasValidToken();
+
+  Future<void> _boot() async {
+    await widget.auth.restore();
     if (!mounted) return;
-    if (ok) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const ChatView()),
-      );
+    if (widget.auth.isLoggedIn) {
+      Navigator.of(context).pushReplacementNamed('/home');
     } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginView()),
-      );
+      Navigator.of(context).pushReplacementNamed('/login');
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

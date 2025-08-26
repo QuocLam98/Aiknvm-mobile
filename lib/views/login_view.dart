@@ -17,6 +17,7 @@ class _LoginViewState extends State<LoginView> {
     final auth = widget.auth;
 
     return Scaffold(
+      backgroundColor: Colors.greenAccent,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 360),
@@ -33,19 +34,22 @@ class _LoginViewState extends State<LoginView> {
                   return Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const FlutterLogo(size: 64),
+                      Image.network(
+                        'https://aiknvm.vn/assets/logo-BrHqVm1P.png',
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.contain,
+                      ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Đăng nhập',
+                        'Aiknvm',
                         style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        kIsWeb
-                            ? 'Web sẽ mở popup Google để đăng nhập'
-                            : 'Thiết bị sẽ mở UI chọn tài khoản Google',
+                            'Ai kỷ nguyên vươn mình',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.black54),
+                        style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 24),
                       SizedBox(

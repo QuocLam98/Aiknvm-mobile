@@ -1,4 +1,4 @@
-package com.example.aiknvm
+package aiknvm.vn
 
 import io.flutter.embedding.android.FlutterActivity
 

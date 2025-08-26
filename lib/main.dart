@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'controllers/auth_controller.dart';
 import 'services/auth_repository.dart';
 import 'routes.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await AuthRepository.init();
+  await dotenv.load(fileName: ".env");     // bắt buộc có
+  await AuthRepository.init();             // init SharedPreferences
   final auth = AuthController(AuthRepository());
   runApp(MyApp(auth: auth));
 }

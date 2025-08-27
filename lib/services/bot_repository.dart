@@ -9,23 +9,18 @@ class BotRepository {
   final http.Client _client;
 
   BotRepository({http.Client? client})
-      : _client = client ?? http.Client(),
-        baseUrl = dotenv.env['API_BASE_URL'] ?? '' {
+    : _client = client ?? http.Client(),
+      baseUrl = dotenv.env['API_BASE_URL'] ?? '' {
     if (baseUrl.isEmpty) {
       throw StateError('Missing API_BASE_URL in .env');
     }
   }
 
   /// GET /bots/{id}
-  Future<BotModel> getBotById(String id, {String? bearerToken}) async {
+  Future<BotModel> getBotById(String id) async {
     final uri = Uri.parse('$baseUrl/get-bot/$id'); // đổi path nếu BE khác
-    final headers = <String, String>{
-      'Accept': 'application/json',
-      if (bearerToken != null && bearerToken.isNotEmpty)
-        'Authorization': 'Bearer $bearerToken',
-    };
 
-    final resp = await _client.get(uri, headers: headers);
+    final resp = await _client.get(uri);
 
     if (resp.statusCode != 200) {
       // ném lỗi để controller hiển thị
@@ -49,6 +44,6 @@ class BotRepository {
     if (botId.isEmpty) {
       throw StateError('Missing DEFAULT_BOT in .env');
     }
-    return getBotById(botId, bearerToken: bearerToken);
+    return getBotById(botId);
   }
 }

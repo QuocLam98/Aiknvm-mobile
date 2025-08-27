@@ -21,7 +21,7 @@ class HomeController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _bot = await _repo.getDefaultBot(bearerToken: bearerToken);
+      _bot = await _repo.getDefaultBot();
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -30,7 +30,8 @@ class HomeController extends ChangeNotifier {
     }
   }
 
-  Future<void> refresh({String? bearerToken}) => loadDefaultBot(bearerToken: bearerToken);
+  Future<void> refresh({String? bearerToken}) =>
+      loadDefaultBot(bearerToken: bearerToken);
 
   void clearError() {
     if (_error != null) {

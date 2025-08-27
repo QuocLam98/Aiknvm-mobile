@@ -39,3 +39,7 @@ class HomeController extends ChangeNotifier {
     }
   }
 }
+  //
+  // Future<void> getDetailUser({String Email}) async {
+  //
+  // }

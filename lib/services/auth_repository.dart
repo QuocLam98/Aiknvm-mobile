@@ -12,6 +12,17 @@ class AuthRepository {
   static const _kJwt = 'auth.jwt';
   static const _kExp = 'auth.exp';
   static SharedPreferences? _prefs;
+  final String baseUrl;
+  final http.Client _client;
+
+
+  AuthRepository({http.Client? client})
+      : _client = client ?? http.Client(),
+        baseUrl = dotenv.env['API_BASE_URL'] ?? '' {
+    if (baseUrl.isEmpty) {
+      throw StateError('Missing API_BASE_URL in .env');
+    }
+  }
 
   static Future<void> init() async {
     _prefs ??= await SharedPreferences.getInstance();
@@ -151,4 +162,30 @@ class AuthRepository {
       return null;
     }
   }
+
+  // Future<Type> getBotById(String Email, {String? bearerToken}) async {
+  //   final uri = Uri.parse('$baseUrl/get-bot/$id'); // đổi path nếu BE khác
+  //   final headers = <String, String>{
+  //     'Accept': 'application/json',
+  //     if (bearerToken != null && bearerToken.isNotEmpty)
+  //       'Authorization': 'Bearer $bearerToken',
+  //   };
+  //
+  //   final resp = await _client.get(uri, headers: headers);
+  //
+  //   if (resp.statusCode != 200) {
+  //     // ném lỗi để controller hiển thị
+  //     throw Exception('GET $uri -> ${resp.statusCode} ${resp.reasonPhrase}');
+  //   }
+  //
+  //   final body = resp.body;
+  //   final json = jsonDecode(body);
+  //
+  //   // Tuỳ backend: { data: {...} } hoặc trả thẳng object
+  //   final map = (json is Map && json['data'] is Map)
+  //       ? (json['data'] as Map<String, dynamic>)
+  //       : (json as Map<String, dynamic>);
+  //
+  //   return AppUser;
+  // }
 }

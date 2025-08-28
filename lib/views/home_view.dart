@@ -16,8 +16,9 @@ class HomeView extends StatefulWidget {
 class _HomeViewState extends State<HomeView> {
   final _inputCtrl = TextEditingController();
 
-  String _short(String s) =>
-      s.length <= 24 ? s : '${s.substring(0, 12)}…${s.substring(s.length - 12)}';
+  String _short(String s) => s.length <= 24
+      ? s
+      : '${s.substring(0, 12)}…${s.substring(s.length - 12)}';
 
   @override
   void initState() {
@@ -37,10 +38,8 @@ class _HomeViewState extends State<HomeView> {
     final home = widget.home;
 
     // lấy tên + email từ user (KHÔNG lấy từ session)
-    final username =
-        auth.user?.name ?? 'lam810';
-    final email =
-        auth.user?.email ?? 'quoclam4a@gmail.com';
+    final username = auth.user?.name ?? 'lam810';
+    final email = auth.user?.email ?? 'quoclam4a@gmail.com';
 
     return Scaffold(
       // APP BAR — giống ảnh, động theo bot
@@ -64,9 +63,8 @@ class _HomeViewState extends State<HomeView> {
               );
             }
             final BotModel? bot = home.bot;
-            final String title =
-            (bot == null || bot.name.trim().isEmpty)
-                ? 'AI. SUPER INTELLIGENCE'
+            final String title = (bot == null || bot.name.trim().isEmpty)
+                ? ''
                 : bot.name;
             return Row(
               children: [
@@ -81,7 +79,7 @@ class _HomeViewState extends State<HomeView> {
                         height: 28,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) =>
-                        const Icon(Icons.smart_toy, color: Colors.black87),
+                            const Icon(Icons.smart_toy, color: Colors.black87),
                       ),
                     ),
                   ),
@@ -115,7 +113,9 @@ class _HomeViewState extends State<HomeView> {
                       Center(
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 12),
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: Colors.black26),
@@ -123,7 +123,9 @@ class _HomeViewState extends State<HomeView> {
                           child: Text(
                             username,
                             style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 14),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                       ),
@@ -143,8 +145,9 @@ class _HomeViewState extends State<HomeView> {
                             child: FilledButton(
                               style: FilledButton.styleFrom(
                                 backgroundColor: Colors.black87,
-                                padding:
-                                const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                               ),
                               onPressed: () {
                                 // TODO: điều hướng nạp tiền
@@ -153,8 +156,9 @@ class _HomeViewState extends State<HomeView> {
                               child: const Text(
                                 'Nạp tiền',
                                 style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600),
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
@@ -163,23 +167,29 @@ class _HomeViewState extends State<HomeView> {
                             child: FilledButton.icon(
                               style: FilledButton.styleFrom(
                                 backgroundColor: const Color(0xFF635BFF),
-                                padding:
-                                const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                               ),
                               onPressed: () async {
                                 await auth.logout();
                                 if (mounted) {
-                                  Navigator.of(context)
-                                      .pushReplacementNamed('/login');
+                                  Navigator.of(
+                                    context,
+                                  ).pushReplacementNamed('/login');
                                 }
                               },
-                              icon: const Icon(Icons.logout,
-                                  size: 18, color: Colors.white),
+                              icon: const Icon(
+                                Icons.logout,
+                                size: 18,
+                                color: Colors.white,
+                              ),
                               label: const Text(
                                 'Đăng xuất',
                                 style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600),
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
@@ -280,12 +290,13 @@ class _HomeViewState extends State<HomeView> {
             builder: (context, constraints) {
               return SingleChildScrollView(
                 child: ConstrainedBox(
-                  constraints:
-                  BoxConstraints(minHeight: constraints.maxHeight),
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
                   child: IntrinsicHeight(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16.0, vertical: 24),
+                        horizontal: 16.0,
+                        vertical: 24,
+                      ),
                       child: Column(
                         children: [
                           const SizedBox(height: 40),
@@ -304,25 +315,25 @@ class _HomeViewState extends State<HomeView> {
                                 ],
                               ),
                               clipBehavior: Clip.antiAlias,
-                              child: (bot != null &&
-                                  bot.image != null &&
-                                  bot.image!.isNotEmpty)
+                              child:
+                                  (bot != null &&
+                                      bot.image != null &&
+                                      bot.image!.isNotEmpty)
                                   ? Image.network(
-                                bot.image!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                const Icon(Icons.smart_toy, size: 64),
-                              )
+                                      bot.image!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          const Icon(Icons.smart_toy, size: 64),
+                                    )
                                   : const ColoredBox(
-                                color: Color(0xFFEFF3F8),
-                                child: Icon(Icons.smart_toy, size: 64),
-                              ),
+                                      color: Color(0xFFEFF3F8),
+                                      child: Icon(Icons.smart_toy, size: 64),
+                                    ),
                             ),
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            (bot?.name ?? 'AI. SUPER INTELLIGENCE')
-                                .toUpperCase(),
+                            (bot?.name ?? '').toUpperCase(),
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               fontSize: 18,
@@ -334,14 +345,12 @@ class _HomeViewState extends State<HomeView> {
                           Text(
                             (bot?.description.isNotEmpty == true)
                                 ? bot!.description
-                                : "I'm here to answer any questions in your language. You only type your request in the chatbox and wait for a moment.",
+                                : "",
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.color
-                                  ?.withOpacity(.75),
+                              color: Theme.of(
+                                context,
+                              ).textTheme.bodyMedium?.color?.withOpacity(.75),
                             ),
                           ),
                           const Spacer(),
@@ -409,7 +418,9 @@ class _HomeViewState extends State<HomeView> {
                   },
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     shape: const StadiumBorder(),
                   ),
                   child: const Icon(Icons.send_rounded, size: 18),

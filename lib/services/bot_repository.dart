@@ -39,11 +39,35 @@ class BotRepository {
   }
 
   /// Lấy bot mặc định từ .env: DEFAULT_BOT
-  Future<BotModel> getDefaultBot({String? bearerToken}) async {
+  Future<BotModel> getDefaultBot() async {
     final botId = dotenv.env['DEFAULT_BOT'] ?? '';
     if (botId.isEmpty) {
       throw StateError('Missing DEFAULT_BOT in .env');
     }
     return getBotById(botId);
+  }
+
+  Future<List<BotModel>> getAllBots() async {
+    final uri = Uri.parse('$baseUrl/list-bot-chat'); // đổi path nếu BE khác
+
+    final resp = await _client.get(uri);
+
+    if (resp.statusCode != 200) {
+      // ném lỗi để controller hiển thị
+      throw Exception('GET $uri -> ${resp.statusCode} ${resp.reasonPhrase}');
+    }
+
+    final body = resp.body;
+    final json = jsonDecode(body);
+
+    // Tuỳ backend: { data: [...] } hoặc trả thẳng array
+    final list = (json is Map && json['data'] is List)
+        ? (json['data'] as List)
+        : (json as List);
+
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(BotModel.fromJson)
+        .toList();
   }
 }

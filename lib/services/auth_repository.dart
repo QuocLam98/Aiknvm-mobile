@@ -100,12 +100,15 @@ class AuthRepository {
 
     final auth = await acc.authentication;
     final idToken = auth.idToken;
-    final accessToken = auth.accessToken;
 
-    String jwt;
-    DateTime expiresAt;
+    // Biến cục bộ để KHÔNG đụng vào getter final
+    String userId = '';
+    String userEmail = '';
+    String jwt = '';
+    late DateTime expiresAt;
 
     if (idToken != null) {
+      // --- Flow chuẩn: gửi idToken cho backend verify ---
       final uri = Uri.parse('$baseUrl/auth/google/callback');
       http.Response resp;
 
@@ -118,7 +121,6 @@ class AuthRepository {
             )
             .timeout(const Duration(seconds: 20));
       } on HandshakeException catch (e) {
-        // Lỗi TLS/SSL (cert/chain/SNI). Hiển thị thông tin dễ hiểu hơn cho UI
         throw Exception(
           'Không thể thiết lập kết nối an toàn tới $uri (TLS handshake). Kiểm tra chứng chỉ HTTPS của server.\n$e',
         );
@@ -141,18 +143,25 @@ class AuthRepository {
           throw Exception('Body không phải JSON hợp lệ: $e');
         }
 
+        // token
         jwt = (data['token'] ?? data['jwt'] ?? '') as String;
         if (jwt.isEmpty) {
           throw Exception('Phản hồi backend không có token');
         }
 
-        // 1) lấy exp từ JWT nếu có
+        // user info: ưu tiên root, fallback data['user'], cuối cùng mới fallback Google account (display-only)
+        final Map<String, dynamic> userJson = (data['user'] is Map)
+            ? (data['user'] as Map).cast<String, dynamic>()
+            : const {};
+
+        userId = (data['id'] ?? userJson['id'] ?? '') as String;
+        userEmail = (data['email'] ?? userJson['email'] ?? '') as String;
+
+        // Hạn dùng
         expiresAt =
             _extractExpFromJwt(jwt) ??
-            // 2) Fallback +6h
             DateTime.now().add(const Duration(hours: 6));
       } else {
-        // Không 200 → ném lỗi có nội dung để debug
         final preview = resp.body.length > 400
             ? '${resp.body.substring(0, 400)}…'
             : resp.body;
@@ -161,15 +170,66 @@ class AuthRepository {
         );
       }
     } else {
-      // Không có idToken → fallback dev (không khuyến nghị)
-      jwt = accessToken ?? 'temp-token';
-      expiresAt = DateTime.now().add(const Duration(hours: 6));
+      // --- Fallback DEV: mobile-login (không khuyến nghị) ---
+      final uri = Uri.parse('$baseUrl/mobile-login');
+      http.Response resp;
+      try {
+        resp = await _client
+            .post(
+              uri,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'email': acc.email,
+                'name': acc.displayName,
+                'picture': acc.photoUrl,
+              }),
+            )
+            .timeout(const Duration(seconds: 20));
+      } on HandshakeException catch (e) {
+        throw Exception(
+          'Không thể thiết lập kết nối an toàn tới $uri (TLS handshake). Kiểm tra chứng chỉ HTTPS của server.\n$e',
+        );
+      } on SocketException catch (e) {
+        throw Exception('Không thể kết nối tới server ($uri). $e');
+      }
+
+      if (resp.statusCode == 200) {
+        late final Map<String, dynamic> data;
+        try {
+          data = jsonDecode(resp.body) as Map<String, dynamic>;
+          debugPrint(
+            const JsonEncoder.withIndent('  ').convert(data),
+            wrapWidth: 1024,
+          );
+        } catch (e) {
+          throw Exception('Body không phải JSON hợp lệ: $e');
+        }
+
+        // Từ ví dụ bạn đưa: id/email nằm ở root
+        jwt = (data['token'] ?? data['jwt'] ?? '') as String? ?? '';
+        userId = data['id'] as String? ?? '';
+        userEmail = data['email'] as String? ?? '';
+
+        expiresAt =
+            _extractExpFromJwt(jwt) ??
+            DateTime.now().add(const Duration(hours: 6));
+      } else {
+        final preview = resp.body.length > 400
+            ? '${resp.body.substring(0, 400)}…'
+            : resp.body;
+        throw Exception(
+          'Đăng nhập thất bại: ${resp.statusCode} ${resp.reasonPhrase}\n$preview',
+        );
+      }
     }
 
+    // Tạo AppUser từ DỮ LIỆU SERVER (không dùng acc.id/email cho auth)
     final user = AppUser(
-      id: acc.id,
-      email: acc.email,
-      name: acc.displayName ?? '',
+      id: userId,
+      email: userEmail,
+      name:
+          acc.displayName ??
+          '', // chỉ dùng để hiển thị nếu server không trả name
       avatarUrl: acc.photoUrl,
     );
 

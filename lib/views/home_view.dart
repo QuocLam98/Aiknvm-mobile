@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+
 import '../controllers/auth_controller.dart';
 import '../controllers/home_controller.dart';
 import '../models/bot_model.dart';
@@ -23,7 +25,7 @@ class _HomeViewState extends State<HomeView> {
   @override
   void initState() {
     super.initState();
-    widget.home.loadDefaultBot(bearerToken: widget.auth.session?.jwt);
+    widget.home.loadDefaultBot();
   }
 
   @override
@@ -37,12 +39,13 @@ class _HomeViewState extends State<HomeView> {
     final auth = widget.auth;
     final home = widget.home;
 
-    // lấy tên + email từ user (KHÔNG lấy từ session)
-    final username = auth.user?.name ?? 'lam810';
-    final email = auth.user?.email ?? 'quoclam4a@gmail.com';
+    final username = auth.user?.name ?? '';
+    final email = auth.user?.email ?? '';
 
     return Scaffold(
-      // APP BAR — giống ảnh, động theo bot
+      resizeToAvoidBottomInset: true,
+
+      // APP BAR
       appBar: AppBar(
         automaticallyImplyLeading: true,
         backgroundColor: Colors.white,
@@ -97,7 +100,7 @@ class _HomeViewState extends State<HomeView> {
         ),
       ),
 
-      // DRAWER — chứa Nạp tiền + Đăng xuất, user info, menu
+      // DRAWER
       drawer: SizedBox(
         width: 320,
         child: Drawer(
@@ -137,8 +140,6 @@ class _HomeViewState extends State<HomeView> {
                         ),
                       ),
                       const SizedBox(height: 12),
-
-                      // Hai nút
                       Row(
                         children: [
                           Expanded(
@@ -151,7 +152,6 @@ class _HomeViewState extends State<HomeView> {
                               ),
                               onPressed: () {
                                 // TODO: điều hướng nạp tiền
-                                // Navigator.pushNamed(context, '/billing');
                               },
                               child: const Text(
                                 'Nạp tiền',
@@ -206,18 +206,13 @@ class _HomeViewState extends State<HomeView> {
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     children: [
                       _MenuItem(
-                        icon: Icons.home,
-                        label: 'Trang chủ',
-                        onTap: () => Navigator.pop(context),
-                      ),
-                      _MenuItem(
-                        icon: Icons.chat_bubble_outline,
+                        icon: const Icon(Icons.chat_bubble_outline),
                         label: 'Chat',
                         active: true,
                         onTap: () => Navigator.pop(context),
                       ),
                       _MenuItem(
-                        icon: Icons.receipt_long,
+                        icon: const Icon(Icons.receipt_long),
                         label: 'Thanh toán và sử dụng',
                         onTap: () {
                           Navigator.pop(context);
@@ -225,29 +220,105 @@ class _HomeViewState extends State<HomeView> {
                         },
                       ),
                       _MenuGroup(
-                        icon: Icons.shield_outlined,
+                        icon: const Icon(Icons.shield_outlined),
                         label: 'Danh sách cho Admin',
                         labelColor: Colors.pink.shade400,
-                        children: [
-                          _SubItem('Quản lý người dùng', onTap: () {}),
-                          _SubItem('Cấu hình hệ thống', onTap: () {}),
+                        children: const [
+                          _SubItem('Quản lý người dùng', onTap: null),
+                          _SubItem('Cấu hình hệ thống', onTap: null),
                         ],
                       ),
+                      // Danh sách trợ lý AI (dynamic)
                       _MenuGroup(
-                        icon: Icons.support_agent_outlined,
+                        icon: const Icon(Icons.support_agent_outlined),
                         label: 'Danh sách trợ lý AI',
+                        maxListHeight: 220,
+                        scrollable: true,
                         children: [
-                          _SubItem('Trợ lý Chat', onTap: () {}),
-                          _SubItem('Trợ lý Dịch', onTap: () {}),
+                          FutureBuilder<List<BotModel>>(
+                            future: home.getAllBots(),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                );
+                              }
+                              if (snapshot.hasError) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 4,
+                                  ),
+                                  child: Text(
+                                    'Lỗi tải danh sách bot: ${snapshot.error}',
+                                    style: const TextStyle(color: Colors.red),
+                                  ),
+                                );
+                              }
+                              final bots = snapshot.data ?? <BotModel>[];
+                              if (bots.isEmpty) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 4,
+                                  ),
+                                  child: Text('Chưa có trợ lý nào'),
+                                );
+                              }
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: bots.map((bot) {
+                                  final isActive = home.bot?.id == bot.id;
+                                  final Widget leading =
+                                      (bot.image != null &&
+                                          bot.image!.isNotEmpty)
+                                      ? ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                          child: Image.network(
+                                            bot.image!,
+                                            width: 22,
+                                            height: 22,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                const Icon(
+                                                  Icons.smart_toy_outlined,
+                                                ),
+                                          ),
+                                        )
+                                      : const Icon(Icons.smart_toy_outlined);
+
+                                  return _MenuItem(
+                                    icon: leading,
+                                    label: bot.name,
+                                    active: isActive,
+                                    onTap: () async {
+                                      await home.setBot(bot);
+                                      if (context.mounted) {
+                                        Navigator.pop(context);
+                                      }
+                                    },
+                                  );
+                                }).toList(),
+                              );
+                            },
+                          ),
                         ],
                       ),
                       _MenuGroup(
-                        icon: Icons.history,
+                        icon: const Icon(Icons.history),
                         label: 'Danh sách lịch sử tin nhắn',
                         labelColor: Colors.deepPurple,
-                        children: [
-                          _SubItem('Tin nhắn gần đây', onTap: () {}),
-                          _SubItem('Tin nhắn đã lưu', onTap: () {}),
+                        children: const [
+                          _SubItem('Tin nhắn gần đây', onTap: null),
+                          _SubItem('Tin nhắn đã lưu', onTap: null),
                         ],
                       ),
                     ],
@@ -274,8 +345,7 @@ class _HomeViewState extends State<HomeView> {
                   Text(home.error!, style: const TextStyle(color: Colors.red)),
                   const SizedBox(height: 8),
                   FilledButton.icon(
-                    onPressed: () =>
-                        home.loadDefaultBot(bearerToken: auth.session?.jwt),
+                    onPressed: () => home.loadDefaultBot(),
                     icon: const Icon(Icons.refresh),
                     label: const Text('Thử lại'),
                   ),
@@ -366,66 +436,101 @@ class _HomeViewState extends State<HomeView> {
         },
       ),
 
-      // Thanh nhập chat
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-        child: Material(
-          elevation: 3,
-          borderRadius: BorderRadius.circular(14),
-          clipBehavior: Clip.antiAlias,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: Theme.of(context).dividerColor.withOpacity(.4),
+      // Thanh nhập chat — đẩy theo chiều cao bàn phím
+      bottomNavigationBar: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SafeArea(
+          minimum: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+          child: Material(
+            elevation: 3,
+            borderRadius: BorderRadius.circular(14),
+            clipBehavior: Clip.antiAlias,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Theme.of(context).dividerColor.withOpacity(.4),
+                ),
               ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _inputCtrl,
-                    minLines: 1,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      hintText: 'please chat here...',
-                      border: InputBorder.none,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _inputCtrl,
+                      minLines: 1,
+                      maxLines: 4,
+                      scrollPadding: const EdgeInsets.only(bottom: 120),
+                      decoration: const InputDecoration(
+                        hintText: 'please chat here...',
+                        border: InputBorder.none,
+                      ),
                     ),
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Ảnh',
-                  onPressed: () {},
-                  icon: const Icon(Icons.image_outlined),
-                ),
-                IconButton(
-                  tooltip: 'PDF',
-                  onPressed: () {},
-                  icon: const Icon(Icons.picture_as_pdf_outlined),
-                ),
-                IconButton(
-                  tooltip: 'DOC',
-                  onPressed: () {},
-                  icon: const Icon(Icons.description_outlined),
-                ),
-                const SizedBox(width: 4),
-                FilledButton(
-                  onPressed: () {
-                    FocusScope.of(context).unfocus();
-                    // TODO: gửi tin nhắn
-                  },
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    shape: const StadiumBorder(),
+                  // Ảnh
+                  IconButton(
+                    tooltip: 'Ảnh',
+                    onPressed: () async {
+                      final result = await FilePicker.platform.pickFiles(
+                        type: FileType.custom,
+                        allowedExtensions: [
+                          'png',
+                          'jpg',
+                          'jpeg',
+                          'webp',
+                          'gif',
+                        ],
+                      );
+                      if (result != null && result.files.isNotEmpty) {
+                        final file = result.files.first;
+                        debugPrint(
+                          'Ảnh được chọn: ${file.name} - ${file.path}',
+                        );
+                        // TODO: upload/gửi file này
+                      }
+                    },
+                    icon: const Icon(Icons.image_outlined),
                   ),
-                  child: const Icon(Icons.send_rounded, size: 18),
-                ),
-              ],
+                  // Tài liệu (PDF, TXT, DOCX)
+                  IconButton(
+                    tooltip: 'Tài liệu',
+                    onPressed: () async {
+                      final result = await FilePicker.platform.pickFiles(
+                        type: FileType.custom,
+                        allowedExtensions: ['pdf', 'txt', 'docx'],
+                      );
+                      if (result != null && result.files.isNotEmpty) {
+                        final file = result.files.first;
+                        debugPrint(
+                          'Document được chọn: ${file.name} - ${file.path}',
+                        );
+                        // TODO: upload/gửi file này
+                      }
+                    },
+                    icon: const Icon(Icons.description_outlined),
+                  ),
+                  const SizedBox(width: 4),
+                  FilledButton(
+                    onPressed: () {
+                      FocusScope.of(context).unfocus();
+                      // TODO: gửi tin nhắn
+                    },
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: const Icon(Icons.send_rounded, size: 18),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -437,7 +542,7 @@ class _HomeViewState extends State<HomeView> {
 /// ===== Widgets phụ cho Drawer =====
 
 class _MenuItem extends StatelessWidget {
-  final IconData icon;
+  final Widget icon; // Icon hoặc Image.network
   final String label;
   final bool active;
   final VoidCallback? onTap;
@@ -467,13 +572,22 @@ class _MenuItem extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
           child: Row(
             children: [
-              Icon(icon, color: fg),
+              IconTheme(
+                data: IconThemeData(color: fg, size: 22),
+                child: icon,
+              ),
               const SizedBox(width: 10),
-              Text(
-                label,
-                style: TextStyle(
-                  color: fg,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              Expanded(
+                // <-- QUAN TRỌNG
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                  style: TextStyle(
+                    color: fg,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                  ),
                 ),
               ),
             ],
@@ -485,34 +599,58 @@ class _MenuItem extends StatelessWidget {
 }
 
 class _MenuGroup extends StatelessWidget {
-  final IconData icon;
+  final Widget icon;
   final String label;
   final List<Widget> children;
   final Color? labelColor;
+  final bool scrollable;
+  final double maxListHeight;
 
   const _MenuGroup({
     required this.icon,
     required this.label,
     required this.children,
     this.labelColor,
+    this.scrollable = false,
+    this.maxListHeight = 260,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Nếu scrollable, bọc phần children bằng SingleChildScrollView (KHÔNG có Scrollbar)
+    final Widget childrenContainer = scrollable
+        ? SizedBox(
+            height: maxListHeight,
+            child: SingleChildScrollView(
+              padding: EdgeInsets.zero,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: children,
+              ),
+            ),
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children,
+          );
+
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 8),
-        childrenPadding: const EdgeInsets.only(left: 48, bottom: 4),
-        leading: Icon(icon),
+        childrenPadding: const EdgeInsets.only(left: 12, bottom: 4),
+        leading: icon,
         title: Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          softWrap: false,
           style: TextStyle(
             fontWeight: FontWeight.w600,
             color: labelColor ?? Colors.black,
           ),
         ),
-        children: children,
+        children: [childrenContainer],
       ),
     );
   }

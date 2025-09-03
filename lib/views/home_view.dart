@@ -4,12 +4,20 @@ import 'package:file_picker/file_picker.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/home_controller.dart';
 import '../models/bot_model.dart';
+import '../controllers/history_controller.dart';
+import '../models/history_message.dart';
 
 class HomeView extends StatefulWidget {
   final AuthController auth;
   final HomeController home;
+  final HistoryController history;
 
-  const HomeView({super.key, required this.auth, required this.home});
+  const HomeView({
+    super.key,
+    required this.auth,
+    required this.home,
+    required this.history,
+  });
 
   @override
   State<HomeView> createState() => _HomeViewState();
@@ -38,9 +46,12 @@ class _HomeViewState extends State<HomeView> {
   Widget build(BuildContext context) {
     final auth = widget.auth;
     final home = widget.home;
+    final history = widget.history;
 
     final username = auth.user?.name ?? '';
     final email = auth.user?.email ?? '';
+    final role = auth.user?.role ?? 'user';
+    final id = auth.user?.id ?? '';
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -219,15 +230,16 @@ class _HomeViewState extends State<HomeView> {
                           // Navigator.pushNamed(context, '/usage');
                         },
                       ),
-                      _MenuGroup(
-                        icon: const Icon(Icons.shield_outlined),
-                        label: 'Danh sách cho Admin',
-                        labelColor: Colors.pink.shade400,
-                        children: const [
-                          _SubItem('Quản lý người dùng', onTap: null),
-                          _SubItem('Cấu hình hệ thống', onTap: null),
-                        ],
-                      ),
+                      if (role == 'admin')
+                        _MenuGroup(
+                          icon: const Icon(Icons.shield_outlined),
+                          label: 'Danh sách cho Admin',
+                          labelColor: Colors.pink.shade400,
+                          children: const [
+                            _SubItem('Quản lý người dùng', onTap: null),
+                            _SubItem('Cấu hình hệ thống', onTap: null),
+                          ],
+                        ),
                       // Danh sách trợ lý AI (dynamic)
                       _MenuGroup(
                         icon: const Icon(Icons.support_agent_outlined),
@@ -316,9 +328,78 @@ class _HomeViewState extends State<HomeView> {
                         icon: const Icon(Icons.history),
                         label: 'Danh sách lịch sử tin nhắn',
                         labelColor: Colors.deepPurple,
-                        children: const [
-                          _SubItem('Tin nhắn gần đây', onTap: null),
-                          _SubItem('Tin nhắn đã lưu', onTap: null),
+                        children: [
+                          FutureBuilder<List<HistoryMessage>>(
+                            future: history
+                                .getHistoryFuture(), // <-- history: HistoryController
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              if (snapshot.hasError) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 4,
+                                  ),
+                                  child: Text(
+                                    'Lỗi tải lịch sử: ${snapshot.error}',
+                                    style: const TextStyle(color: Colors.red),
+                                  ),
+                                );
+                              }
+
+                              final list =
+                                  snapshot.data ?? const <HistoryMessage>[];
+                              if (list.isEmpty) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 4,
+                                  ),
+                                  child: Text('Chưa có lịch sử nào'),
+                                );
+                              }
+
+                              // Nghe selected thay đổi để highlight item đang active
+                              return AnimatedBuilder(
+                                animation: history,
+                                builder: (_, __) {
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: list.map((item) {
+                                      final isActive =
+                                          history.selected?.id == item.id;
+                                      return _MenuItem(
+                                        label:
+                                            item.name ??
+                                            '', // tuỳ field của HistoryMessage
+                                        active: isActive,
+                                        onTap: () async {
+                                          history.selectHistory(item);
+                                          if (context.mounted) {
+                                            Navigator.pop(
+                                              context,
+                                            ); // đóng drawer/menu
+                                          }
+                                        },
+                                      );
+                                    }).toList(),
+                                  );
+                                },
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ],
@@ -542,13 +623,13 @@ class _HomeViewState extends State<HomeView> {
 /// ===== Widgets phụ cho Drawer =====
 
 class _MenuItem extends StatelessWidget {
-  final Widget icon; // Icon hoặc Image.network
+  final Widget? icon; // Icon hoặc Image.network
   final String label;
   final bool active;
   final VoidCallback? onTap;
 
   const _MenuItem({
-    required this.icon,
+    this.icon,
     required this.label,
     this.active = false,
     this.onTap,
@@ -574,7 +655,7 @@ class _MenuItem extends StatelessWidget {
             children: [
               IconTheme(
                 data: IconThemeData(color: fg, size: 22),
-                child: icon,
+                child: icon ?? SizedBox.shrink(),
               ),
               const SizedBox(width: 10),
               Expanded(

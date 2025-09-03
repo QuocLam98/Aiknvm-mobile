@@ -1,4 +1,3 @@
-// lib/controllers/history_controller.dart
 import 'package:flutter/foundation.dart';
 import '../models/history_message.dart';
 import '../services/history_message_repository.dart';
@@ -8,57 +7,51 @@ class HistoryController extends ChangeNotifier {
   final HistoryMessageRepository _repo;
   final AuthController _auth;
 
-  HistoryController(this._repo, this._auth, {String? endpoint})
-    : _endpoint = endpoint ?? '/history/messages';
+  HistoryController(this._repo, this._auth);
 
   final List<HistoryMessage> _items = [];
-  bool _busy = false;
-  String? _error;
-
-  String _endpoint; // endpoint động
+  HistoryMessage? _selected;
+  Future<List<HistoryMessage>>? _historyFuture;
 
   List<HistoryMessage> get items => List.unmodifiable(_items);
-  bool get busy => _busy;
-  String? get error => _error;
-  String get endpoint => _endpoint;
+  HistoryMessage? get selected => _selected;
+  Future<List<HistoryMessage>>? get historyFuture => _historyFuture;
 
-  void setEndpoint(String endpoint, {bool refreshNow = false}) {
-    _endpoint = endpoint;
-    if (refreshNow) load();
-  }
-
-  Future<void> load() async {
-    final uid = _auth.user?.id; // lấy từ lúc đăng nhập
-    if (uid == null || uid.isEmpty) {
-      _error = 'Thiếu userId (chưa đăng nhập?)';
-      notifyListeners();
-      return;
+  /// Lấy Future đã cache nếu có; nếu chưa thì tạo mới
+  Future<List<HistoryMessage>> getHistoryFuture() {
+    final uid = _auth.user?.id ?? '';
+    if (uid.isEmpty) {
+      _historyFuture = Future.error('Thiếu userId (chưa đăng nhập?)');
+      return _historyFuture!;
     }
-
-    _busy = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      final data = await _repo.fetchByUser(
-        endpoint: _endpoint, // '/v1/history/{userId}' hoặc '/v1/history'
-        userId: uid,
-      );
+    _historyFuture ??= _repo.getHistoryChatByUserId(uid).then((list) {
       _items
         ..clear()
-        ..addAll(data);
-    } catch (e) {
-      _error = e.toString();
-    } finally {
-      _busy = false;
+        ..addAll(list);
       notifyListeners();
-    }
+      return _items;
+    });
+    return _historyFuture!;
   }
 
-  void clearError() {
-    if (_error != null) {
-      _error = null;
-      notifyListeners();
+  /// Refresh cưỡng bức (kéo để làm mới)
+  Future<void> refreshHistory() async {
+    final uid = _auth.user?.id ?? '';
+    if (uid.isEmpty) {
+      throw StateError('Thiếu userId (chưa đăng nhập?)');
     }
+    _historyFuture = _repo.getHistoryChatByUserId(uid).then((list) {
+      _items
+        ..clear()
+        ..addAll(list);
+      notifyListeners();
+      return _items;
+    });
+    await _historyFuture;
+  }
+
+  void selectHistory(HistoryMessage item) {
+    _selected = item;
+    notifyListeners();
   }
 }

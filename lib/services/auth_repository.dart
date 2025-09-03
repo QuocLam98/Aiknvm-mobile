@@ -104,6 +104,7 @@ class AuthRepository {
     // Biến cục bộ để KHÔNG đụng vào getter final
     String userId = '';
     String userEmail = '';
+    String userRole = 'user'; // mặc định
     String jwt = '';
     late DateTime expiresAt;
 
@@ -209,6 +210,7 @@ class AuthRepository {
         jwt = (data['token'] ?? data['jwt'] ?? '') as String? ?? '';
         userId = data['id'] as String? ?? '';
         userEmail = data['email'] as String? ?? '';
+        userRole = data['role'] as String? ?? 'user'; // lấy role nếu có
 
         expiresAt =
             _extractExpFromJwt(jwt) ??
@@ -231,6 +233,7 @@ class AuthRepository {
           acc.displayName ??
           '', // chỉ dùng để hiển thị nếu server không trả name
       avatarUrl: acc.photoUrl,
+      role: userRole,
     );
 
     final session = AuthSession(jwt: jwt, expiresAt: expiresAt);

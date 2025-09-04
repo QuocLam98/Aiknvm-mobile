@@ -6,8 +6,12 @@ import 'routes.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");     // bắt buộc có
-  await AuthRepository.init();             // init SharedPreferences
+  await dotenv.load(fileName: ".env");
+  await AuthRepository.init();
+
+  // luôn clear session khi start app
+  await AuthRepository.clearSession();
+
   final auth = AuthController(AuthRepository());
   runApp(MyApp(auth: auth));
 }
@@ -22,12 +26,11 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'App',
       theme: ThemeData(useMaterial3: true),
-      initialRoute: '/',                                       // Splash -> /login|/home
+      initialRoute: '/', // Splash -> /login|/home
       onGenerateRoute: (settings) => onGenerateRoute(settings, auth),
       onUnknownRoute: (_) => MaterialPageRoute(
-        builder: (_) => const Scaffold(
-          body: Center(child: Text('Route not found')),
-        ),
+        builder: (_) =>
+            const Scaffold(body: Center(child: Text('Route not found'))),
       ),
     );
   }

@@ -66,7 +66,7 @@ class HomeController extends ChangeNotifier {
   }
 
   /// Chọn bot theo id (nếu menu trả id)
-  Future<void> loadBotById(String botId) async {
+  Future<BotModel> loadBotById(String botId) async {
     try {
       _busy = true;
       _error = null;
@@ -74,8 +74,10 @@ class HomeController extends ChangeNotifier {
 
       final bot = await _repo.getBotById(botId);
       _bot = bot;
+      return bot;
     } catch (e) {
       _error = e.toString();
+      rethrow; // Optionally rethrow the error if needed
     } finally {
       _busy = false;
       notifyListeners();

@@ -47,7 +47,7 @@ class AuthController extends ChangeNotifier {
 
         _error = null;
       } else {
-        await _repo.clearSession();
+        await AuthRepository.clearSession();
         _session = null;
         _user = null;
       }

@@ -5,50 +5,64 @@ import '../controllers/auth_controller.dart';
 import '../controllers/home_controller.dart';
 import '../controllers/history_controller.dart';
 import '../models/bot_model.dart';
-import '../models/history_message.dart'; // nếu body cần
-import '../widgets/app_drawer.dart'; // <-- quan trọng: import Drawer tái sử dụng
+import '../widgets/app_drawer.dart';
 import '../widgets/drawer_key.dart';
-import '../views/chat_view.dart';
 
-class HomeView extends StatefulWidget {
+class ChatView extends StatefulWidget {
   final AuthController auth;
   final HomeController home;
   final HistoryController history;
+  final String botId;
 
-  const HomeView({
+  const ChatView({
     super.key,
     required this.auth,
     required this.home,
     required this.history,
+    required this.botId,
   });
 
   @override
-  State<HomeView> createState() => _HomeViewState();
+  State<ChatView> createState() => _ChatViewState();
 }
 
-class _HomeViewState extends State<HomeView> {
+class _ChatViewState extends State<ChatView> {
+  final _inputCtrl = TextEditingController();
+  late Future<BotModel> _botFuture; // fetch 1 lần
+
+  @override
+  void initState() {
+    super.initState();
+    _botFuture = _load(); // load bot + setBot để đồng bộ highlight
+  }
+
+  Future<BotModel> _load() async {
+    // Bạn đang dùng home.loadBotById; giữ nguyên cho khớp code hiện tại.
+    final bot = await widget.home.loadBotById(widget.botId);
+    await widget.home.setBot(bot); // đảm bảo Drawer highlight đúng bot
+    return bot;
+  }
+
   void _handleDrawerSelect(DrawerKey key) {
     switch (key.kind) {
       case DrawerKind.chat:
-        // đang ở Home -> có thể pop về Home hoặc làm gì tùy bạn
-        // Navigator.pushReplacementNamed(context, '/home');
+        // quay về màn Home/Chat nếu muốn
+        Navigator.pushReplacementNamed(context, '/home');
         break;
-
       case DrawerKind.usage:
         Navigator.pushNamed(context, '/usage');
         break;
-
       case DrawerKind.adminUsers:
         Navigator.pushNamed(context, '/admin/users');
         break;
-
       case DrawerKind.adminConfig:
         Navigator.pushNamed(context, '/admin/config');
         break;
-
       case DrawerKind.bot:
         if (key.id == null) return;
-        Navigator.push(
+        // Nếu chọn cùng bot hiện tại thì không cần push thêm
+        if (key.id == widget.botId) return;
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (_) => ChatView(
@@ -60,24 +74,10 @@ class _HomeViewState extends State<HomeView> {
           ),
         );
         break;
-
       case DrawerKind.history:
-        // tùy bạn có màn riêng không
         Navigator.pushNamed(context, '/history', arguments: key.id);
         break;
     }
-  }
-
-  final _inputCtrl = TextEditingController();
-
-  String _short(String s) => s.length <= 24
-      ? s
-      : '${s.substring(0, 12)}…${s.substring(s.length - 12)}';
-
-  @override
-  void initState() {
-    super.initState();
-    widget.home.loadDefaultBot();
   }
 
   @override
@@ -102,10 +102,10 @@ class _HomeViewState extends State<HomeView> {
         elevation: 0.5,
         titleSpacing: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
-        title: AnimatedBuilder(
-          animation: home,
-          builder: (_, __) {
-            if (home.busy) {
+        title: FutureBuilder<BotModel>(
+          future: _botFuture, // dùng 1 future cho cả appbar & body
+          builder: (_, snapshot) {
+            if (!snapshot.hasData) {
               return const Text(
                 'Đang tải...',
                 style: TextStyle(
@@ -115,13 +115,10 @@ class _HomeViewState extends State<HomeView> {
                 ),
               );
             }
-            final BotModel? bot = home.bot;
-            final String title = (bot == null || bot.name.trim().isEmpty)
-                ? ''
-                : bot.name;
+            final bot = snapshot.data!;
             return Row(
               children: [
-                if (bot?.image != null && bot!.image!.isNotEmpty)
+                if (bot.image != null && bot.image!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ClipRRect(
@@ -137,7 +134,7 @@ class _HomeViewState extends State<HomeView> {
                     ),
                   ),
                 Text(
-                  title,
+                  bot.name,
                   style: const TextStyle(
                     color: Colors.black,
                     fontWeight: FontWeight.w700,
@@ -150,31 +147,34 @@ class _HomeViewState extends State<HomeView> {
         ),
       ),
 
-      // DRAWER: dùng widget tái sử dụng
+      // DRAWER: truyền current để highlight đúng bot
       drawer: AppDrawer(
         auth: auth,
         home: home,
         history: history,
-        current: const DrawerKey(DrawerKind.chat),
-        onSelect: (key) => _handleDrawerSelect(key), // <-- bỏ context
+        current: DrawerKey(DrawerKind.bot, id: widget.botId),
+        onSelect: _handleDrawerSelect,
       ),
 
       // BODY
-      body: AnimatedBuilder(
-        animation: home,
-        builder: (_, __) {
-          if (home.busy) {
+      body: FutureBuilder<BotModel>(
+        future: _botFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (home.error != null) {
+          if (snapshot.hasError) {
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(home.error!, style: const TextStyle(color: Colors.red)),
+                  Text(
+                    'Lỗi: ${snapshot.error}',
+                    style: const TextStyle(color: Colors.red),
+                  ),
                   const SizedBox(height: 8),
                   FilledButton.icon(
-                    onPressed: () => home.loadDefaultBot(),
+                    onPressed: () => setState(() => _botFuture = _load()),
                     icon: const Icon(Icons.refresh),
                     label: const Text('Thử lại'),
                   ),
@@ -183,8 +183,7 @@ class _HomeViewState extends State<HomeView> {
             );
           }
 
-          final BotModel? bot = home.bot;
-
+          final bot = snapshot.data!;
           return LayoutBuilder(
             builder: (context, constraints) {
               return SingleChildScrollView(
@@ -215,9 +214,7 @@ class _HomeViewState extends State<HomeView> {
                               ),
                               clipBehavior: Clip.antiAlias,
                               child:
-                                  (bot != null &&
-                                      bot.image != null &&
-                                      bot.image!.isNotEmpty)
+                                  (bot.image != null && bot.image!.isNotEmpty)
                                   ? Image.network(
                                       bot.image!,
                                       fit: BoxFit.cover,
@@ -232,7 +229,7 @@ class _HomeViewState extends State<HomeView> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            (bot?.name ?? '').toUpperCase(),
+                            bot.name.toUpperCase(),
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               fontSize: 18,
@@ -242,8 +239,8 @@ class _HomeViewState extends State<HomeView> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            (bot?.description.isNotEmpty == true)
-                                ? bot!.description
+                            (bot.description.isNotEmpty == true)
+                                ? bot.description
                                 : "",
                             textAlign: TextAlign.center,
                             style: TextStyle(
@@ -301,7 +298,6 @@ class _HomeViewState extends State<HomeView> {
                       ),
                     ),
                   ),
-                  // Ảnh
                   IconButton(
                     tooltip: 'Ảnh',
                     onPressed: () async {
@@ -316,16 +312,13 @@ class _HomeViewState extends State<HomeView> {
                         ],
                       );
                       if (result != null && result.files.isNotEmpty) {
-                        final file = result.files.first;
-                        debugPrint(
-                          'Ảnh được chọn: ${file.name} - ${file.path}',
-                        );
-                        // TODO: upload/gửi file này
+                        final f = result.files.first;
+                        debugPrint('Ảnh được chọn: ${f.name} - ${f.path}');
+                        // TODO: upload/gửi file
                       }
                     },
                     icon: const Icon(Icons.image_outlined),
                   ),
-                  // Tài liệu
                   IconButton(
                     tooltip: 'Tài liệu',
                     onPressed: () async {
@@ -334,11 +327,9 @@ class _HomeViewState extends State<HomeView> {
                         allowedExtensions: ['pdf', 'txt', 'docx'],
                       );
                       if (result != null && result.files.isNotEmpty) {
-                        final file = result.files.first;
-                        debugPrint(
-                          'Document được chọn: ${file.name} - ${file.path}',
-                        );
-                        // TODO: upload/gửi file này
+                        final f = result.files.first;
+                        debugPrint('Doc được chọn: ${f.name} - ${f.path}');
+                        // TODO: upload/gửi file
                       }
                     },
                     icon: const Icon(Icons.description_outlined),

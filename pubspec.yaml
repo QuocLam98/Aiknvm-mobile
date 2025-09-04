@@ -44,6 +44,7 @@ dev_dependencies:
   flutter_dotenv: ^5.1.0
   file_picker: ^8.1.2
   flutter_launcher_icons: ^0.13.1
+  niku: 2.4.2
 
 
   # The "flutter_lints" package below contains a set of recommended lints to

@@ -48,6 +48,11 @@ class AuthRepository {
     }
   }
 
+  static Future<void> clearSession() async {
+    await _prefs?.remove(_kJwt);
+    await _prefs?.remove(_kExp);
+  }
+
   /// Chỉ gọi một lần ở app start
   static Future<void> init() async {
     _prefs ??= await SharedPreferences.getInstance();
@@ -74,11 +79,6 @@ class AuthRepository {
   Future<void> persistSession(AuthSession s) async {
     await _sp.setString(_kJwt, s.jwt);
     await _sp.setInt(_kExp, s.expiresAt.millisecondsSinceEpoch);
-  }
-
-  Future<void> clearSession() async {
-    await _sp.remove(_kJwt);
-    await _sp.remove(_kExp);
   }
 
   /// Đăng nhập Google:

@@ -53,20 +53,26 @@ class AppDrawer extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.black26),
-                        ),
-                        child: Text(
-                          username,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () => _popThen(() {
+                          Navigator.pushNamed(context, '/account');
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.black26),
+                          ),
+                          child: Text(
+                            username,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                       ),
@@ -160,8 +166,16 @@ class AppDrawer extends StatelessWidget {
                       }),
                     ),
 
+                    _MenuItem(
+                      icon: const Icon(Icons.admin_panel_settings_outlined),
+                      label: 'Trang quản trị',
+                      onTap: () => _popThen(() {
+                        Navigator.pushNamed(context, '/admin');
+                      }),
+                    ),
+
                     // Admin
-                    if (role == 'admin')
+                    if (false && role == 'admin')
                       _MenuGroup(
                         icon: const Icon(Icons.shield_outlined),
                         label: 'Danh sách cho Admin',

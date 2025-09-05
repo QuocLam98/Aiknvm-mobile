@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:io';
+import 'package:flutter/services.dart';
 
 import '../controllers/auth_controller.dart';
 import '../controllers/home_controller.dart';
@@ -71,8 +72,18 @@ class _ChatViewState extends State<ChatView> {
         break;
       case DrawerKind.bot:
         if (key.id == null) return;
-        if (key.id == widget.botId) return;
-        Navigator.pushReplacementNamed(context, '/chat', arguments: key.id!);
+        final id = key.id!;
+        if (id == widget.botId) return;
+        final imgId = dotenv.env['CREATE_IMAGE']?.trim();
+        final imgPremiumId = dotenv.env['CREATE_IMAGE_PREMIUM']?.trim();
+        // Ưu tiên bot CREATE_IMAGE trước
+        if (imgId != null && imgId.isNotEmpty && id == imgId) {
+          Navigator.pushReplacementNamed(context, '/chat_image', arguments: id);
+        } else if (imgPremiumId != null && imgPremiumId.isNotEmpty && id == imgPremiumId) {
+          Navigator.pushReplacementNamed(context, '/chat_image/premium', arguments: id);
+        } else {
+          Navigator.pushReplacementNamed(context, '/chat', arguments: id);
+        }
         break;
       case DrawerKind.history:
         Navigator.pushNamed(context, '/history', arguments: key.id);
@@ -132,12 +143,17 @@ class _ChatViewState extends State<ChatView> {
                       ),
                     ),
                   ),
-                Text(
-                  bot.name,
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
+                Expanded(
+                  child: Text(
+                    bot.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
               ],
@@ -372,7 +388,33 @@ class _ChatViewState extends State<ChatView> {
                   color: bg,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Text(m.text, style: TextStyle(color: fg, fontSize: 14)),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        m.text,
+                        style: TextStyle(color: fg, fontSize: 14),
+                      ),
+                    ),
+                    if (!isUser)
+                      IconButton(
+                        tooltip: 'Sao chép',
+                        splashRadius: 18,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        onPressed: () async {
+                          await Clipboard.setData(ClipboardData(text: m.text));
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Đã sao chép nội dung')),
+                            );
+                          }
+                        },
+                        icon: Icon(Icons.copy, color: fg, size: 16),
+                      ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -620,4 +662,3 @@ class _ChatViewState extends State<ChatView> {
     }
   }
 }
-

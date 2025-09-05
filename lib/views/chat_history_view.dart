@@ -12,6 +12,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/drawer_key.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
@@ -71,7 +72,17 @@ class _HistoryChatViewState extends State<HistoryChatView> {
         break;
       case DrawerKind.bot:
         if (key.id == null || key.id!.isEmpty) return;
-        Navigator.pushReplacementNamed(context, '/chat', arguments: key.id!);
+        final id = key.id!;
+        final imgId = dotenv.env['CREATE_IMAGE']?.trim();
+        final imgPremiumId = dotenv.env['CREATE_IMAGE_PREMIUM']?.trim();
+        // Ưu tiên bot CREATE_IMAGE trước
+        if (imgId != null && imgId.isNotEmpty && id == imgId) {
+          Navigator.pushReplacementNamed(context, '/chat_image', arguments: id);
+        } else if (imgPremiumId != null && imgPremiumId.isNotEmpty && id == imgPremiumId) {
+          Navigator.pushReplacementNamed(context, '/chat_image/premium', arguments: id);
+        } else {
+          Navigator.pushReplacementNamed(context, '/chat', arguments: id);
+        }
         break;
       case DrawerKind.history:
         if (key.id == null || key.id!.isEmpty) return;
@@ -267,12 +278,17 @@ class _HistoryChatViewState extends State<HistoryChatView> {
               ),
             ),
           ),
-        Text(
-          bot.name,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: Colors.black87,
+        Expanded(
+          child: Text(
+            bot.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
+            ),
           ),
         ),
       ],
@@ -301,7 +317,33 @@ class _HistoryChatViewState extends State<HistoryChatView> {
                   color: bg,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Text(m.text, style: TextStyle(color: fg, fontSize: 14)),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        m.text,
+                        style: TextStyle(color: fg, fontSize: 14),
+                      ),
+                    ),
+                    if (!isUser)
+                      IconButton(
+                        tooltip: 'Sao chép',
+                        splashRadius: 18,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        onPressed: () async {
+                          await Clipboard.setData(ClipboardData(text: m.text));
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Đã sao chép nội dung')),
+                            );
+                          }
+                        },
+                        icon: Icon(Icons.copy, color: fg, size: 16),
+                      ),
+                  ],
+                ),
               ),
             ),
           ],

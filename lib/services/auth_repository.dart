@@ -291,4 +291,113 @@ class AuthRepository {
           (X509Certificate cert, String host, int port) => true;
     return IOClient(io);
   }
+
+  /// Cập nhật số điện thoại theo userId (không cần token)
+  Future<void> updatePhoneById({
+    required String userId,
+    required String phone,
+  }) async {
+    if (userId.isEmpty) {
+      throw ArgumentError('userId is empty');
+    }
+    final uri = Uri.parse('$baseUrl/update-phone-mobile');
+    final headers = <String, String>{'Content-Type': 'application/json'};
+
+    final resp = await _client.post(
+      uri,
+      headers: headers,
+      body: jsonEncode({'id': userId, 'phone': phone}),
+    );
+
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      return;
+    }
+
+    try {
+      final map = jsonDecode(resp.body) as Map<String, dynamic>;
+      final msg = (map['message'] ?? map['error'] ?? resp.reasonPhrase)
+          .toString();
+      throw Exception('Cập nhật thất bại: ${resp.statusCode} $msg');
+    } catch (_) {
+      throw Exception(
+        'Cập nhật thất bại: ${resp.statusCode} ${resp.reasonPhrase}',
+      );
+    }
+  }
+
+  /// Cập nhật số điện thoại của tài khoản hiện tại
+  Future<void> updatePhone(String phone, {String? bearerToken}) async {
+    final uri = Uri.parse('$baseUrl/update-phone-mobile');
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (bearerToken != null && bearerToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $bearerToken';
+    }
+
+    final resp = await _client.post(
+      uri,
+      headers: headers,
+      body: jsonEncode({'phone': phone}),
+    );
+
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      return;
+    }
+
+    // Thử lấy message từ body nếu có
+    try {
+      final map = jsonDecode(resp.body) as Map<String, dynamic>;
+      final msg = (map['message'] ?? map['error'] ?? resp.reasonPhrase)
+          .toString();
+      throw Exception('Cập nhật thất bại: ${resp.statusCode} $msg');
+    } catch (_) {
+      throw Exception(
+        'Cập nhật thất bại: ${resp.statusCode} ${resp.reasonPhrase}',
+      );
+    }
+  }
+
+  /// Lấy thông tin hồ sơ người dùng (email, phone, avatar...) theo userId
+  /// Backend chỉ nhận id (không cần token)
+  Future<AppUser> getProfileById(String userId) async {
+    if (userId.isEmpty) {
+      throw ArgumentError('userId is empty');
+    }
+    final uri = Uri.parse('$baseUrl/me');
+    final resp = await _client.post(
+      uri,
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({'id': userId}),
+    );
+    if (resp.statusCode != 200) {
+      throw Exception('POST $uri -> ${resp.statusCode} ${resp.reasonPhrase}');
+    }
+
+    late final Map<String, dynamic> data;
+    final root = jsonDecode(resp.body);
+    if (root is Map && root['data'] is Map) {
+      data = Map<String, dynamic>.from(root['data'] as Map);
+    } else if (root is Map<String, dynamic>) {
+      data = root;
+    } else {
+      throw Exception('Unexpected profile format');
+    }
+
+    final id = (data['id'] ?? data['_id'] ?? data['userId'] ?? '').toString();
+    final email = (data['email'] ?? '').toString();
+    final name = (data['name'] ?? data['fullName'] ?? '').toString();
+    final avatar =
+        (data['avatar'] ?? data['avatarUrl'] ?? data['picture'] ?? '')
+            .toString();
+    final role = (data['role'] ?? 'user').toString();
+    final phone = (data['phone'] ?? data['phoneNumber'] ?? '').toString();
+
+    return AppUser(
+      id: id,
+      email: email,
+      name: name.isEmpty ? null : name,
+      avatarUrl: avatar.isEmpty ? null : avatar,
+      role: role.isEmpty ? null : role,
+      phone: phone.isEmpty ? null : phone,
+    );
+  }
 }

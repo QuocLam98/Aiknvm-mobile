@@ -9,6 +9,7 @@ import '../models/history_message.dart'; // nếu body cần
 import '../widgets/app_drawer.dart'; // <-- quan trọng: import Drawer tái sử dụng
 import '../widgets/drawer_key.dart';
 import '../views/chat_view.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class HomeView extends StatefulWidget {
   final AuthController auth;
@@ -48,7 +49,17 @@ class _HomeViewState extends State<HomeView> {
 
       case DrawerKind.bot:
         if (key.id == null) return;
-        Navigator.pushNamed(context, '/chat', arguments: key.id!);
+        final id = key.id!;
+        final imgId = dotenv.env['CREATE_IMAGE']?.trim();
+        final imgPremiumId = dotenv.env['CREATE_IMAGE_PREMIUM']?.trim();
+        // Ưu tiên bot CREATE_IMAGE trước
+        if (imgId != null && imgId.isNotEmpty && id == imgId) {
+          Navigator.pushNamed(context, '/chat_image', arguments: id);
+        } else if (imgPremiumId != null && imgPremiumId.isNotEmpty && id == imgPremiumId) {
+          Navigator.pushNamed(context, '/chat_image/premium', arguments: id);
+        } else {
+          Navigator.pushNamed(context, '/chat', arguments: id);
+        }
         break;
 
       case DrawerKind.history:

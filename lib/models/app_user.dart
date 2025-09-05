@@ -4,6 +4,7 @@ class AppUser {
   final String? name;
   final String? avatarUrl;
   final String? role;
+  final String? phone;
 
   const AppUser({
     required this.id,
@@ -11,5 +12,6 @@ class AppUser {
     this.name,
     this.avatarUrl,
     this.role,
+    this.phone,
   });
 }

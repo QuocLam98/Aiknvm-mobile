@@ -69,10 +69,6 @@ class HistoryMessageRepository {
 
     // Nếu BE trả trực tiếp object { _id, name, bot }
     if (decoded is Map<String, dynamic>) {
-      debugPrint(
-        const JsonEncoder.withIndent('  ').convert(decoded),
-        wrapWidth: 1024,
-      );
       return HistoryMessage.fromJson(decoded);
     }
 

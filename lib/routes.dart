@@ -15,6 +15,15 @@ import 'views/splash_view.dart';
 import 'views/login_view.dart';
 import 'views/home_view.dart';
 import 'views/chat_view.dart';
+import 'views/chat_image_view.dart';
+import 'views/chat_image_premium_view.dart';
+import 'views/account_view.dart';
+import 'views/admin_list_view.dart';
+import 'views/admin_accounts_view.dart';
+import 'views/admin_bots_view.dart';
+import 'views/admin_messages_view.dart';
+import 'views/admin_payments_view.dart';
+import 'views/admin_products_view.dart';
 
 Route<dynamic> onGenerateRoute(RouteSettings settings, AuthController auth) {
   switch (settings.name) {
@@ -38,6 +47,37 @@ Route<dynamic> onGenerateRoute(RouteSettings settings, AuthController auth) {
         ),
       );
 
+    case '/account':
+      return MaterialPageRoute(
+        builder: (_) => AccountView(auth: auth),
+      );
+
+    case '/admin':
+      return MaterialPageRoute(
+        builder: (_) => const AdminListView(),
+      );
+
+    case '/admin/accounts':
+      return MaterialPageRoute(
+        builder: (_) => const AdminAccountsView(),
+      );
+    case '/admin/bots':
+      return MaterialPageRoute(
+        builder: (_) => const AdminBotsView(),
+      );
+    case '/admin/messages':
+      return MaterialPageRoute(
+        builder: (_) => const AdminMessagesView(),
+      );
+    case '/admin/payments':
+      return MaterialPageRoute(
+        builder: (_) => const AdminPaymentsView(),
+      );
+    case '/admin/products':
+      return MaterialPageRoute(
+        builder: (_) => const AdminProductsView(),
+      );
+
     // Chat by botId (nullable)
     case '/chat':
       final String? botId =
@@ -52,6 +92,40 @@ Route<dynamic> onGenerateRoute(RouteSettings settings, AuthController auth) {
           home: homeCtrl,
           history: historyCtrl,
           botId: botId,
+        ),
+      );
+
+    // Chat image basic (no file upload)
+    case '/chat_image':
+      final String? botIdImg =
+          (settings.arguments is String) ? settings.arguments as String : null;
+
+      final homeCtrlImg = HomeController(BotRepository());
+      final historyCtrlImg = HistoryController(HistoryMessageRepository(), auth);
+
+      return MaterialPageRoute(
+        builder: (_) => ChatImageView(
+          auth: auth,
+          home: homeCtrlImg,
+          history: historyCtrlImg,
+          botId: botIdImg,
+        ),
+      );
+
+    // Chat image premium (allow sending images)
+    case '/chat_image/premium':
+      final String? botIdImgP =
+          (settings.arguments is String) ? settings.arguments as String : null;
+
+      final homeCtrlImgP = HomeController(BotRepository());
+      final historyCtrlImgP = HistoryController(HistoryMessageRepository(), auth);
+
+      return MaterialPageRoute(
+        builder: (_) => ChatImagePremiumView(
+          auth: auth,
+          home: homeCtrlImgP,
+          history: historyCtrlImgP,
+          botId: botIdImgP,
         ),
       );
 
@@ -83,4 +157,3 @@ Route<dynamic> onGenerateRoute(RouteSettings settings, AuthController auth) {
       return MaterialPageRoute(builder: (_) => SplashView(auth: auth));
   }
 }
-

@@ -3,6 +3,6 @@ enum DrawerKind { chat, usage, adminUsers, adminConfig, bot, history }
 
 class DrawerKey {
   final DrawerKind kind;
-  final String? id; // dùng cho bot/history
+  final String? id;
   const DrawerKey(this.kind, {this.id});
 }

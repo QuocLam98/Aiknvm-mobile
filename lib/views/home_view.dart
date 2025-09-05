@@ -48,22 +48,12 @@ class _HomeViewState extends State<HomeView> {
 
       case DrawerKind.bot:
         if (key.id == null) return;
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ChatView(
-              auth: widget.auth,
-              home: widget.home,
-              history: widget.history,
-              botId: key.id!,
-            ),
-          ),
-        );
+        Navigator.pushNamed(context, '/chat', arguments: key.id!);
         break;
 
       case DrawerKind.history:
         // tùy bạn có màn riêng không
-        Navigator.pushNamed(context, '/history', arguments: key.id);
+        Navigator.pushReplacementNamed(context, '/history', arguments: key.id!);
         break;
     }
   }

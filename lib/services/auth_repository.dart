@@ -136,10 +136,6 @@ class AuthRepository {
         late final Map<String, dynamic> data;
         try {
           data = jsonDecode(resp.body) as Map<String, dynamic>;
-          debugPrint(
-            const JsonEncoder.withIndent('  ').convert(data),
-            wrapWidth: 1024,
-          );
         } catch (e) {
           throw Exception('Body không phải JSON hợp lệ: $e');
         }

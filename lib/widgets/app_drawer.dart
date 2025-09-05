@@ -6,6 +6,7 @@ import '../controllers/history_controller.dart';
 import '../models/bot_model.dart';
 import '../models/history_message.dart';
 import '../widgets/drawer_key.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AppDrawer extends StatelessWidget {
   final AuthController auth;
@@ -145,7 +146,7 @@ class AppDrawer extends StatelessWidget {
                       label: 'Chat',
                       active: current.kind == DrawerKind.chat,
                       onTap: () => _popThen(() {
-                        onSelect?.call(const DrawerKey(DrawerKind.chat));
+                        Navigator.pushReplacementNamed(context, '/chat');
                       }),
                     ),
 
@@ -219,7 +220,12 @@ class AppDrawer extends StatelessWidget {
                               );
                             }
                             final bots = snapshot.data ?? <BotModel>[];
-                            if (bots.isEmpty) {
+                            final defaultId = dotenv.env['DEFAULT_BOT']?.trim();
+                            final listBots = (defaultId == null || defaultId.isEmpty)
+                                ? bots
+                                : bots.where((b) => b.id != defaultId).toList();
+
+                            if (listBots.isEmpty) {
                               return const Padding(
                                 padding: EdgeInsets.symmetric(
                                   vertical: 12,
@@ -234,7 +240,7 @@ class AppDrawer extends StatelessWidget {
                               builder: (_, __) {
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: bots.map((bot) {
+                                  children: listBots.map((bot) {
                                     final Widget leading =
                                         (bot.image != null &&
                                             bot.image!.isNotEmpty)
@@ -343,13 +349,14 @@ class AppDrawer extends StatelessWidget {
                                       label: item.name ?? '',
                                       active: isActive,
                                       onTap: () {
+                                        if (item.id == null) return; // <- guard
                                         history.selectHistory(item);
                                         _popThen(() {
                                           onSelect?.call(
                                             DrawerKey(
                                               DrawerKind.history,
-                                              id: item.id,
-                                            ),
+                                              id: item.id!,
+                                            ), // <- truyền id
                                           );
                                         });
                                       },

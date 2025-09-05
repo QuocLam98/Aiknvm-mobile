@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/auth_controller.dart';
+import '../services/bot_repository.dart';
 
 
 class SplashView extends StatefulWidget {
@@ -24,7 +25,25 @@ class _SplashViewState extends State<SplashView> {
     await widget.auth.restore();
     if (!mounted) return;
     if (widget.auth.isLoggedIn) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      // Prefetch danh sách trợ lý và cache ảnh trước khi vào app
+      try {
+        final repo = BotRepository();
+        final bots = await repo.getAllBots();
+        final futures = <Future<void>>[];
+        for (final b in bots) {
+          final url = b.image;
+          if (url != null && url.isNotEmpty) {
+            futures.add(precacheImage(NetworkImage(url), context).catchError((_) {}));
+          }
+        }
+        if (futures.isNotEmpty) {
+          await Future.wait(futures);
+        }
+      } catch (_) {
+        // Bỏ qua lỗi prefetch để không chặn vào app
+      }
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed('/chat');
     } else {
       Navigator.of(context).pushReplacementNamed('/login');
     }

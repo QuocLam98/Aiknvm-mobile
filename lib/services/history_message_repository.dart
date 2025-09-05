@@ -39,10 +39,6 @@ class HistoryMessageRepository {
     }
 
     final body = resp.body;
-    debugPrint(
-      const JsonEncoder.withIndent('  ').convert(body),
-      wrapWidth: 1024,
-    );
     final json = jsonDecode(body);
 
     // Tuỳ backend: { data: [...] } hoặc trả thẳng array
@@ -56,33 +52,36 @@ class HistoryMessageRepository {
         .toList();
   }
 
-  Future<List<ChatMessageModel>> loadChatByHistoryId(
-    String historyId, {
-    int page = 1,
-    int limit = 20,
-  }) async {
-    final uri = Uri.parse(
-      '$baseUrl/list-message-mobile?page=$page&limit=$limit&id=$historyId',
-    );
+  Future<HistoryMessage> getHistoryById(String id) async {
+    final uri = Uri.parse('$baseUrl/history-chat-mobile-by-id');
 
-    final resp = await _client.get(
+    final resp = await _client.post(
       uri,
       headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({"id": id}),
     );
 
     if (resp.statusCode != 200) {
-      throw Exception(
-        'GET $uri failed: ${resp.statusCode} ${resp.reasonPhrase}',
+      throw Exception('POST $uri -> ${resp.statusCode} ${resp.reasonPhrase}');
+    }
+
+    final decoded = jsonDecode(resp.body);
+
+    // Nếu BE trả trực tiếp object { _id, name, bot }
+    if (decoded is Map<String, dynamic>) {
+      debugPrint(
+        const JsonEncoder.withIndent('  ').convert(decoded),
+        wrapWidth: 1024,
       );
+      return HistoryMessage.fromJson(decoded);
     }
 
-    final json = jsonDecode(resp.body) as Map<String, dynamic>;
-
-    if (json['status'] != 200) {
-      throw Exception('API error: ${json['message']}');
+    // Nếu BE bọc trong { data: {...} }
+    if (decoded is Map<String, dynamic> &&
+        decoded['data'] is Map<String, dynamic>) {
+      return HistoryMessage.fromJson(decoded['data']);
     }
 
-    final List<dynamic> list = json['data'] ?? [];
-    return list.map((e) => ChatMessageModel.fromJson(e)).toList();
+    throw Exception('Unexpected format from API: $decoded');
   }
 }

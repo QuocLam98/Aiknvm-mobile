@@ -1,105 +1,69 @@
-// sender enum
-enum Sender { user, bot }
-
-Sender senderFromString(String v) => v == 'bot' ? Sender.bot : Sender.user;
-
-String senderToString(Sender s) => s == Sender.bot ? 'bot' : 'user';
-
 class ChatMessageModel {
-  final Sender sender;
-  final String content;
-  final DateTime createdAt;
+  final String id;
+  final String text;
+  final String role; // "user" | "bot"
+  final DateTime? createdAt;
+  final String? fileUrl; // URL tệp đính kèm (user)
+  final String? fileType; // loại tệp từ server (image/pdf/docx/txt/...)
 
-  final String? fileUser;
-  final int status;
-
-  final bool? loading; // map từ _loading?
-  final String id; // map từ _id
-  final bool? isCopied;
-  final String? displayContent;
-  final bool isDone;
-  final String? history;
-  final String? fileType;
-  final String? voice;
-
-  const ChatMessageModel({
-    required this.sender,
-    required this.content,
-    required this.createdAt,
-    required this.status,
+  ChatMessageModel({
     required this.id,
-    required this.isDone,
-    this.fileUser,
-    this.loading,
-    this.isCopied,
-    this.displayContent,
-    this.history,
+    required this.text,
+    required this.role,
+    this.createdAt,
+    this.fileUrl,
     this.fileType,
-    this.voice,
   });
 
-  factory ChatMessageModel.fromJson(Map<String, dynamic> json) =>
-      ChatMessageModel(
-        sender: senderFromString(json['sender'] as String),
-        content: json['content'] as String? ?? '',
-        createdAt:
-            DateTime.tryParse(json['createdAt'] as String? ?? '') ??
-            DateTime.now(),
-        fileUser: json['fileUser'] as String?,
-        status: (json['status'] as num).toInt(),
-        loading: json['_loading'] as bool?, // dùng nội bộ
-        id: json['_id'] as String,
-        isCopied: json['isCopied'] as bool?,
-        displayContent: json['displayContent'] as String?,
-        isDone: (json['isDone'] as bool?) ?? false,
-        history: json['history'] as String?,
-        fileType: json['fileType'] as String?,
-        voice: json['voice'] as String?,
-      );
+  /// Lấy "id gốc" của 1 record (bỏ hậu tố _u/_b)
+  String get baseId {
+    if (id.endsWith('_u') || id.endsWith('_b')) {
+      return id.substring(0, id.length - 2);
+    }
+    return id;
+  }
 
-  Map<String, dynamic> toJson() => {
-    'sender': senderToString(sender),
-    'content': content,
-    'createdAt': createdAt.toIso8601String(),
-    'fileUser': fileUser,
-    'status': status,
-    '_loading': loading,
-    '_id': id,
-    'isCopied': isCopied,
-    'displayContent': displayContent,
-    'isDone': isDone,
-    'history': history,
-    'fileType': fileType,
-    'voice': voice,
-  };
+  /// NẾU cần một factory “đơn” (ít dùng)
+  factory ChatMessageModel.fromServerJson(Map<String, dynamic> j) {
+    final id = (j['_id'] ?? '').toString();
+    final createdAt = j['createdAt'] != null
+        ? DateTime.tryParse(j['createdAt'])
+        : null;
 
-  ChatMessageModel copyWith({
-    Sender? sender,
-    String? content,
-    DateTime? createdAt,
-    String? fileUser,
-    int? status,
-    bool? loading,
-    String? id,
-    bool? isCopied,
-    String? displayContent,
-    bool? isDone,
-    String? history,
-    String? fileType,
-    String? voice,
-  }) => ChatMessageModel(
-    sender: sender ?? this.sender,
-    content: content ?? this.content,
-    createdAt: createdAt ?? this.createdAt,
-    fileUser: fileUser ?? this.fileUser,
-    status: status ?? this.status,
-    loading: loading ?? this.loading,
-    id: id ?? this.id,
-    isCopied: isCopied ?? this.isCopied,
-    displayContent: displayContent ?? this.displayContent,
-    isDone: isDone ?? this.isDone,
-    history: history ?? this.history,
-    fileType: fileType ?? this.fileType,
-    voice: voice ?? this.voice,
-  );
+    // Trả về 1 bản bot; KHÔNG dùng trực tiếp để render.
+    return ChatMessageModel(
+      id: "${id}_b",
+      text: j['contentBot'] ?? '',
+      role: 'bot',
+      createdAt: createdAt,
+    );
+  }
+
+  /// CHUẨN: Convert 1 record server -> 0..2 messages (user + bot)
+  static List<ChatMessageModel> expandFromServer(Map<String, dynamic> j) {
+    final id = (j['_id'] ?? '').toString();
+    final createdAt = j['createdAt'] != null
+        ? DateTime.tryParse(j['createdAt'])
+        : null;
+
+    final userMsg = ChatMessageModel(
+      id: "${id}_u",
+      text: j['contentUser'] ?? '',
+      role: 'user',
+      createdAt: createdAt,
+      fileUrl: (j['fileUser'] ?? '')?.toString(),
+      fileType: (j['fileType'] ?? '')?.toString(),
+    );
+    final botMsg = ChatMessageModel(
+      id: "${id}_b",
+      text: j['contentBot'] ?? '',
+      role: 'bot',
+      createdAt: createdAt,
+    );
+
+    return [
+      if (userMsg.text.isNotEmpty) userMsg,
+      if (botMsg.text.isNotEmpty) botMsg,
+    ];
+  }
 }

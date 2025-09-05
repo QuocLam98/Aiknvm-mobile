@@ -54,4 +54,13 @@ class HistoryController extends ChangeNotifier {
     _selected = item;
     notifyListeners();
   }
+
+  Future<HistoryMessage?> getById(String id) async {
+    try {
+      return await _repo.getHistoryById(id); // đảm bảo repo có hàm này
+    } catch (e) {
+      debugPrint('getById error: $e');
+      return null;
+    }
+  }
 }

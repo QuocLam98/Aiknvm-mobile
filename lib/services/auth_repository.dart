@@ -50,10 +50,25 @@ class AuthRepository {
   static Future<void> init() async {
     _prefs ??= await SharedPreferences.getInstance();
     // Khởi tạo Google Sign-In (v7: cần initialize trước khi dùng)
-    final rawClientId = dotenv.env['GOOGLE_WEB_CLIENT_ID']?.trim();
-    final clientIdOrNull = (rawClientId == null || rawClientId.isEmpty)
-        ? null
-        : rawClientId;
+    // Ưu tiên lấy từ dotenv (web: từ public /.env; mobile: từ --dart-define nếu truyền vào main())
+    final envClientId = dotenv.env['GOOGLE_WEB_CLIENT_ID']?.trim();
+    // Fallback an toàn cho Android: hard-code giá trị không bí mật (OAuth Web Client ID)
+    // để tránh lỗi clientConfigurationError khi chưa truyền --dart-define.
+    const fallbackAndroidWebClientId =
+        '514725903844-d2lfdqh57kegcck6hpva4p442e4jbaje.apps.googleusercontent.com';
+
+    final resolvedClientId = (envClientId != null && envClientId.isNotEmpty)
+        ? envClientId
+        : fallbackAndroidWebClientId;
+
+    final clientIdOrNull = resolvedClientId.isEmpty ? null : resolvedClientId;
+
+    // Log ngắn gọn để kiểm tra cấu hình (ẩn bớt ID)
+    final preview = (clientIdOrNull == null || clientIdOrNull.length < 10)
+        ? 'null'
+        : '${clientIdOrNull.substring(0, 8)}…${clientIdOrNull.substring(clientIdOrNull.length - 10)}';
+    debugPrint('GoogleSignIn init - kIsWeb=$kIsWeb, serverClientId(Android)=$preview');
+
     await GoogleSignIn.instance.initialize(
       clientId: kIsWeb ? clientIdOrNull : null,
       serverClientId: kIsWeb ? null : clientIdOrNull,

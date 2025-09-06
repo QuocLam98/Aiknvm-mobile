@@ -24,29 +24,22 @@ class AuthRepository {
   /// HTTP client (có thể inject Dio/IOClient nếu cần)
   final http.Client _client;
 
-  /// 1 instance GoogleSignIn dùng xuyên suốt
-  final GoogleSignIn _google;
+  /// Singleton GoogleSignIn dùng xuyên suốt (v7 API)
+  final GoogleSignIn _google = GoogleSignIn.instance;
 
   /// Khởi tạo mặc định.
   /// - `client`: có thể truyền IOClient custom (VD: dev bypass SSL - **chỉ debug**)
-  /// - `google`: tuỳ biến scopes/clientId
   /// - `baseUrlOverride`: dùng khi bạn muốn override .env
-  AuthRepository({
-    http.Client? client,
-    GoogleSignIn? google,
-    String? baseUrlOverride,
-  }) : _client = client ?? http.Client(),
-       baseUrl = baseUrlOverride ?? dotenv.env['API_BASE_URL'] ?? '',
-       _google =
-           google ??
-           GoogleSignIn(
-             clientId: kIsWeb ? dotenv.env['GOOGLE_WEB_CLIENT_ID'] : null,
-             scopes: const ['email', 'profile', 'openid'],
-           ) {
-    if (baseUrl.isEmpty) {
-      throw StateError('Missing API_BASE_URL in .env');
-    }
-  }
+  AuthRepository({http.Client? client, String? baseUrlOverride})
+    : _client = client ?? http.Client(),
+      baseUrl =
+          baseUrlOverride ??
+          (dotenv.maybeGet('API_BASE_URL') ??
+                  const String.fromEnvironment(
+                    'API_BASE_URL',
+                    defaultValue: '',
+                  ))
+              .trim();
 
   static Future<void> clearSession() async {
     await _prefs?.remove(_kJwt);
@@ -56,6 +49,15 @@ class AuthRepository {
   /// Chỉ gọi một lần ở app start
   static Future<void> init() async {
     _prefs ??= await SharedPreferences.getInstance();
+    // Khởi tạo Google Sign-In (v7: cần initialize trước khi dùng)
+    final rawClientId = dotenv.env['GOOGLE_WEB_CLIENT_ID']?.trim();
+    final clientIdOrNull = (rawClientId == null || rawClientId.isEmpty)
+        ? null
+        : rawClientId;
+    await GoogleSignIn.instance.initialize(
+      clientId: kIsWeb ? clientIdOrNull : null,
+      serverClientId: kIsWeb ? null : clientIdOrNull,
+    );
   }
 
   Future<bool> get hasValidSession async {
@@ -86,19 +88,14 @@ class AuthRepository {
   /// - Android/iOS: dựa packageId + SHA-1/BundleId
   /// - BE: POST { idToken } -> { token/jwt, ... }
   Future<(AppUser, AuthSession)> signInWithGoogle() async {
-    // bảo đảm trạng thái sạch để UI luôn hiện popup khi cần
+    // Sạch trạng thái trước khi auth
     try {
-      if (await _google.isSignedIn()) {
-        await _google.signOut();
-      }
+      await _google.signOut();
     } catch (_) {}
 
-    final acc = await _google.signIn();
-    if (acc == null) {
-      throw Exception('User huỷ đăng nhập');
-    }
-
-    final auth = await acc.authentication;
+    // v7 API: authenticate() trả về account + tokens; authentication là getter
+    final acc = await _google.authenticate();
+    final auth = acc.authentication;
     final idToken = auth.idToken;
 
     // Biến cục bộ để KHÔNG đụng vào getter final
@@ -242,16 +239,12 @@ class AuthRepository {
   /// - disconnect() chỉ khi muốn revoke scopes; bọc try/catch để tránh channel-error
   Future<void> logout() async {
     try {
-      if (await _google.isSignedIn()) {
-        await _google.signOut();
-      }
+      await _google.signOut();
     } catch (_) {}
 
     // Chỉ revoke nếu thực sự cần (ít khi phải dùng)
     try {
-      if (await _google.isSignedIn()) {
-        await _google.disconnect();
-      }
+      await _google.disconnect();
     } catch (_) {
       // Bỏ qua lỗi channel-error trên một số thiết bị
     }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "447582173547",
+    "project_id": "aiknvm-5da63",
+    "storage_bucket": "aiknvm-5da63.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:447582173547:android:0caf23069ed27d6ba9742e",
+        "android_client_info": {
+          "package_name": "aiknvm.vn"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAZYe6OK95DJaJUZP53A2VufXnSl5KePBs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

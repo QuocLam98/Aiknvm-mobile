@@ -18,11 +18,26 @@ Future<void> main() async {
 
   // 1) Lấy giá trị từ --dart-define (ưu tiên cao nhất)
   final fromDefines = <String, String>{
-    'API_BASE_URL': const String.fromEnvironment('API_BASE_URL', defaultValue: ''),
-    'GOOGLE_WEB_CLIENT_ID': const String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: ''),
-    'DEFAULT_BOT': const String.fromEnvironment('DEFAULT_BOT', defaultValue: ''),
-    'CREATE_IMAGE': const String.fromEnvironment('CREATE_IMAGE', defaultValue: ''),
-    'CREATE_IMAGE_PREMIUM': const String.fromEnvironment('CREATE_IMAGE_PREMIUM', defaultValue: ''),
+    'API_BASE_URL': const String.fromEnvironment(
+      'API_BASE_URL',
+      defaultValue: '',
+    ),
+    'GOOGLE_CLIENT_ID': const String.fromEnvironment(
+      'GOOGLE_CLIENT_ID',
+      defaultValue: '',
+    ),
+    'DEFAULT_BOT': const String.fromEnvironment(
+      'DEFAULT_BOT',
+      defaultValue: '',
+    ),
+    'CREATE_IMAGE': const String.fromEnvironment(
+      'CREATE_IMAGE',
+      defaultValue: '',
+    ),
+    'CREATE_IMAGE_PREMIUM': const String.fromEnvironment(
+      'CREATE_IMAGE_PREMIUM',
+      defaultValue: '',
+    ),
   };
 
   // 2) Nếu chạy Web, thử fetch '/.env' (không cần liệt kê vào assets)
@@ -51,10 +66,7 @@ Future<void> main() async {
   }
 
   // 3) Merge: file public (web) < dart-define (ưu tiên override)
-  final merged = <String, String>{
-    ...fromPublic,
-    ...fromDefines,
-  };
+  final merged = <String, String>{...fromPublic, ...fromDefines};
 
   // Không bundle .env vào assets; chỉ nạp map đã merge.
   await dotenv.load(isOptional: true, mergeWith: merged);

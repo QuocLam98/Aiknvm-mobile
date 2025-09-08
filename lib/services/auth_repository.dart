@@ -51,7 +51,7 @@ class AuthRepository {
     _prefs ??= await SharedPreferences.getInstance();
     // Khởi tạo Google Sign-In (v7: cần initialize trước khi dùng)
     // Ưu tiên lấy từ dotenv (web: từ public /.env; mobile: từ --dart-define nếu truyền vào main())
-    final envClientId = dotenv.env['GOOGLE_WEB_CLIENT_ID']?.trim();
+    final envClientId = dotenv.env['GOOGLE_CLIENT_ID']?.trim();
     // Fallback an toàn cho Android: hard-code giá trị không bí mật (OAuth Web Client ID)
     // để tránh lỗi clientConfigurationError khi chưa truyền --dart-define.
     const fallbackAndroidWebClientId =
@@ -67,7 +67,9 @@ class AuthRepository {
     final preview = (clientIdOrNull == null || clientIdOrNull.length < 10)
         ? 'null'
         : '${clientIdOrNull.substring(0, 8)}…${clientIdOrNull.substring(clientIdOrNull.length - 10)}';
-    debugPrint('GoogleSignIn init - kIsWeb=$kIsWeb, serverClientId(Android)=$preview');
+    debugPrint(
+      'GoogleSignIn init - kIsWeb=$kIsWeb, serverClientId(Android)=$preview',
+    );
 
     await GoogleSignIn.instance.initialize(
       clientId: kIsWeb ? clientIdOrNull : null,
@@ -99,7 +101,7 @@ class AuthRepository {
   }
 
   /// Đăng nhập Google:
-  /// - Web: cần GOOGLE_WEB_CLIENT_ID trong .env
+  /// - Web: cần GOOGLE_CLIENT_ID trong .env
   /// - Android/iOS: dựa packageId + SHA-1/BundleId
   /// - BE: POST { idToken } -> { token/jwt, ... }
   Future<(AppUser, AuthSession)> signInWithGoogle() async {

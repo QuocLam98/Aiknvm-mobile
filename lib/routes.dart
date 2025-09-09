@@ -47,41 +47,30 @@ Route<dynamic> onGenerateRoute(RouteSettings settings, AuthController auth) {
         ),
       );
 
-    case '/account':
-      return MaterialPageRoute(
-        builder: (_) => AccountView(auth: auth),
-      );
+    // case '/account':
+    //   return MaterialPageRoute(
+    //     builder: (_) => AccountView(auth: auth),
+    //   );
 
     case '/admin':
-      return MaterialPageRoute(
-        builder: (_) => const AdminListView(),
-      );
+      return MaterialPageRoute(builder: (_) => const AdminListView());
 
     case '/admin/accounts':
-      return MaterialPageRoute(
-        builder: (_) => const AdminAccountsView(),
-      );
+      return MaterialPageRoute(builder: (_) => const AdminAccountsView());
     case '/admin/bots':
-      return MaterialPageRoute(
-        builder: (_) => const AdminBotsView(),
-      );
+      return MaterialPageRoute(builder: (_) => const AdminBotsView());
     case '/admin/messages':
-      return MaterialPageRoute(
-        builder: (_) => const AdminMessagesView(),
-      );
+      return MaterialPageRoute(builder: (_) => const AdminMessagesView());
     case '/admin/payments':
-      return MaterialPageRoute(
-        builder: (_) => const AdminPaymentsView(),
-      );
+      return MaterialPageRoute(builder: (_) => const AdminPaymentsView());
     case '/admin/products':
-      return MaterialPageRoute(
-        builder: (_) => const AdminProductsView(),
-      );
+      return MaterialPageRoute(builder: (_) => const AdminProductsView());
 
     // Chat by botId (nullable)
     case '/chat':
-      final String? botId =
-          (settings.arguments is String) ? settings.arguments as String : null;
+      final String? botId = (settings.arguments is String)
+          ? settings.arguments as String
+          : null;
 
       final homeCtrl = HomeController(BotRepository());
       final historyCtrl = HistoryController(HistoryMessageRepository(), auth);
@@ -97,11 +86,15 @@ Route<dynamic> onGenerateRoute(RouteSettings settings, AuthController auth) {
 
     // Chat image basic (no file upload)
     case '/chat_image':
-      final String? botIdImg =
-          (settings.arguments is String) ? settings.arguments as String : null;
+      final String? botIdImg = (settings.arguments is String)
+          ? settings.arguments as String
+          : null;
 
       final homeCtrlImg = HomeController(BotRepository());
-      final historyCtrlImg = HistoryController(HistoryMessageRepository(), auth);
+      final historyCtrlImg = HistoryController(
+        HistoryMessageRepository(),
+        auth,
+      );
 
       return MaterialPageRoute(
         builder: (_) => ChatImageView(
@@ -114,11 +107,15 @@ Route<dynamic> onGenerateRoute(RouteSettings settings, AuthController auth) {
 
     // Chat image premium (allow sending images)
     case '/chat_image/premium':
-      final String? botIdImgP =
-          (settings.arguments is String) ? settings.arguments as String : null;
+      final String? botIdImgP = (settings.arguments is String)
+          ? settings.arguments as String
+          : null;
 
       final homeCtrlImgP = HomeController(BotRepository());
-      final historyCtrlImgP = HistoryController(HistoryMessageRepository(), auth);
+      final historyCtrlImgP = HistoryController(
+        HistoryMessageRepository(),
+        auth,
+      );
 
       return MaterialPageRoute(
         builder: (_) => ChatImagePremiumView(

@@ -18,62 +18,39 @@ class AuthRepository {
   static SharedPreferences get _sp =>
       _prefs ?? (throw StateError('Call AuthRepository.init() before use'));
 
-  /// API base URL, ví dụ: https://server.aiknvm.vn
   final String baseUrl;
-
-  /// HTTP client (có thể inject Dio/IOClient nếu cần)
   final http.Client _client;
-
-  /// Singleton GoogleSignIn dùng xuyên suốt (v7 API)
   final GoogleSignIn _google = GoogleSignIn.instance;
 
-  /// Khởi tạo mặc định.
-  /// - `client`: có thể truyền IOClient custom (VD: dev bypass SSL - **chỉ debug**)
-  /// - `baseUrlOverride`: dùng khi bạn muốn override .env
   AuthRepository({http.Client? client, String? baseUrlOverride})
     : _client = client ?? http.Client(),
       baseUrl =
-          baseUrlOverride ??
-          (dotenv.maybeGet('API_BASE_URL') ??
-                  const String.fromEnvironment(
-                    'API_BASE_URL',
-                    defaultValue: '',
-                  ))
+          (baseUrlOverride ??
+                  (dotenv.maybeGet('API_BASE_URL') ??
+                      const String.fromEnvironment(
+                        'API_BASE_URL',
+                        defaultValue: '',
+                      )))
               .trim();
 
-  static Future<void> clearSession() async {
-    await _prefs?.remove(_kJwt);
-    await _prefs?.remove(_kExp);
-  }
-
-  /// Chỉ gọi một lần ở app start
   static Future<void> init() async {
     _prefs ??= await SharedPreferences.getInstance();
-    // Khởi tạo Google Sign-In (v7: cần initialize trước khi dùng)
-    // Ưu tiên lấy từ dotenv (web: từ public /.env; mobile: từ --dart-define nếu truyền vào main())
-    final envClientId = dotenv.env['GOOGLE_CLIENT_ID']?.trim();
-    // Fallback an toàn cho Android: hard-code giá trị không bí mật (OAuth Web Client ID)
-    // để tránh lỗi clientConfigurationError khi chưa truyền --dart-define.
-    const fallbackAndroidWebClientId =
-        '514725903844-d2lfdqh57kegcck6hpva4p442e4jbaje.apps.googleusercontent.com';
 
-    final resolvedClientId = (envClientId != null && envClientId.isNotEmpty)
-        ? envClientId
-        : fallbackAndroidWebClientId;
+    final webClientId = const String.fromEnvironment(
+      'GOOGLE_WEB_CLIENT_ID',
+      defaultValue: '',
+    ).trim();
+    if (webClientId.isEmpty) {
+      throw StateError(
+        'Missing GOOGLE_WEB CLIENT_ID (pass via --dart-define).',
+      );
+    }
 
-    final clientIdOrNull = resolvedClientId.isEmpty ? null : resolvedClientId;
-
-    // Log ngắn gọn để kiểm tra cấu hình (ẩn bớt ID)
-    final preview = (clientIdOrNull == null || clientIdOrNull.length < 10)
-        ? 'null'
-        : '${clientIdOrNull.substring(0, 8)}…${clientIdOrNull.substring(clientIdOrNull.length - 10)}';
-    debugPrint(
-      'GoogleSignIn init - kIsWeb=$kIsWeb, serverClientId(Android)=$preview',
-    );
+    debugPrint('GoogleSignIn.initialize id=${webClientId.substring(0, 12)}…');
 
     await GoogleSignIn.instance.initialize(
-      clientId: kIsWeb ? clientIdOrNull : null,
-      serverClientId: kIsWeb ? null : clientIdOrNull,
+      clientId: kIsWeb ? webClientId : null, // Web
+      serverClientId: kIsWeb ? null : webClientId, // Android/iOS
     );
   }
 
@@ -100,148 +77,75 @@ class AuthRepository {
     await _sp.setInt(_kExp, s.expiresAt.millisecondsSinceEpoch);
   }
 
-  /// Đăng nhập Google:
-  /// - Web: cần GOOGLE_CLIENT_ID trong .env
-  /// - Android/iOS: dựa packageId + SHA-1/BundleId
-  /// - BE: POST { idToken } -> { token/jwt, ... }
+  /// Đăng nhập Google (mobile v7 + web), **không dùng Firebase**.
+  /// Mobile gửi idToken lên `/auth/google/mobile`.
   Future<(AppUser, AuthSession)> signInWithGoogle() async {
-    // Sạch trạng thái trước khi auth
+    final gs = GoogleSignIn.instance;
+
+    // làm sạch trạng thái trước khi auth (tránh cache account cũ)
     try {
-      await _google.signOut();
+      await gs.signOut();
+    } catch (_) {}
+    try {
+      await gs.attemptLightweightAuthentication();
     } catch (_) {}
 
-    // v7 API: authenticate() trả về account + tokens; authentication là getter
-    final acc = await _google.authenticate();
-    final auth = acc.authentication;
-    final idToken = auth.idToken;
-
-    // Biến cục bộ để KHÔNG đụng vào getter final
-    String userId = '';
-    String userEmail = '';
-    String userRole = 'user'; // mặc định
-    String jwt = '';
-    late DateTime expiresAt;
-
-    if (idToken != null) {
-      // --- Flow chuẩn: gửi idToken cho backend verify ---
-      final uri = Uri.parse('$baseUrl/auth/google/callback');
-      http.Response resp;
-
-      try {
-        resp = await _client
-            .post(
-              uri,
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({'idToken': idToken}),
-            )
-            .timeout(const Duration(seconds: 20));
-      } on HandshakeException catch (e) {
-        throw Exception(
-          'Không thể thiết lập kết nối an toàn tới $uri (TLS handshake). Kiểm tra chứng chỉ HTTPS của server.\n$e',
-        );
-      } on SocketException catch (e) {
-        throw Exception('Không thể kết nối tới server ($uri). $e');
-      }
-
-      debugPrint('HTTP ${resp.request?.method} $uri -> ${resp.statusCode}');
-      debugPrint(resp.body);
-
-      if (resp.statusCode == 200) {
-        late final Map<String, dynamic> data;
-        try {
-          data = jsonDecode(resp.body) as Map<String, dynamic>;
-        } catch (e) {
-          throw Exception('Body không phải JSON hợp lệ: $e');
-        }
-
-        // token
-        jwt = (data['token'] ?? data['jwt'] ?? '') as String;
-        if (jwt.isEmpty) {
-          throw Exception('Phản hồi backend không có token');
-        }
-
-        // user info: ưu tiên root, fallback data['user'], cuối cùng mới fallback Google account (display-only)
-        final Map<String, dynamic> userJson = (data['user'] is Map)
-            ? (data['user'] as Map).cast<String, dynamic>()
-            : const {};
-
-        userId = (data['id'] ?? userJson['id'] ?? '') as String;
-        userEmail = (data['email'] ?? userJson['email'] ?? '') as String;
-
-        // Hạn dùng
-        expiresAt =
-            _extractExpFromJwt(jwt) ??
-            DateTime.now().add(const Duration(hours: 6));
-      } else {
-        final preview = resp.body.length > 400
-            ? '${resp.body.substring(0, 400)}…'
-            : resp.body;
-        throw Exception(
-          'Đăng nhập thất bại: ${resp.statusCode} ${resp.reasonPhrase}\n$preview',
-        );
-      }
-    } else {
-      // --- Fallback DEV: mobile-login (không khuyến nghị) ---
-      final uri = Uri.parse('$baseUrl/mobile-login');
-      http.Response resp;
-      try {
-        resp = await _client
-            .post(
-              uri,
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({
-                'email': acc.email,
-                'name': acc.displayName,
-                'picture': acc.photoUrl,
-              }),
-            )
-            .timeout(const Duration(seconds: 20));
-      } on HandshakeException catch (e) {
-        throw Exception(
-          'Không thể thiết lập kết nối an toàn tới $uri (TLS handshake). Kiểm tra chứng chỉ HTTPS của server.\n$e',
-        );
-      } on SocketException catch (e) {
-        throw Exception('Không thể kết nối tới server ($uri). $e');
-      }
-
-      if (resp.statusCode == 200) {
-        late final Map<String, dynamic> data;
-        try {
-          data = jsonDecode(resp.body) as Map<String, dynamic>;
-          debugPrint(
-            const JsonEncoder.withIndent('  ').convert(data),
-            wrapWidth: 1024,
-          );
-        } catch (e) {
-          throw Exception('Body không phải JSON hợp lệ: $e');
-        }
-
-        // Từ ví dụ bạn đưa: id/email nằm ở root
-        jwt = (data['token'] ?? data['jwt'] ?? '') as String? ?? '';
-        userId = data['id'] as String? ?? '';
-        userEmail = data['email'] as String? ?? '';
-        userRole = data['role'] as String? ?? 'user'; // lấy role nếu có
-
-        expiresAt =
-            _extractExpFromJwt(jwt) ??
-            DateTime.now().add(const Duration(hours: 6));
-      } else {
-        final preview = resp.body.length > 400
-            ? '${resp.body.substring(0, 400)}…'
-            : resp.body;
-        throw Exception(
-          'Đăng nhập thất bại: ${resp.statusCode} ${resp.reasonPhrase}\n$preview',
-        );
-      }
+    // v7: authenticate()
+    final acc = await gs.authenticate();
+    if (acc == null) {
+      throw Exception('Người dùng đã hủy đăng nhập Google');
     }
 
-    // Tạo AppUser từ DỮ LIỆU SERVER (không dùng acc.id/email cho auth)
+    final auth = await acc.authentication; // v7 vẫn có
+    final idToken = auth.idToken;
+    if (idToken == null || idToken.isEmpty) {
+      throw Exception(
+        'Không lấy được idToken. Kiểm tra initialize(serverClientId: GOOGLE_WEB_CLIENT_ID).',
+      );
+    }
+
+    final uri = Uri.parse('$baseUrl/auth/google/mobile');
+
+    final resp = await _client
+        .post(
+          uri,
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode({'idToken': idToken}),
+        )
+        .timeout(const Duration(seconds: 20));
+
+    debugPrint('HTTP ${resp.request?.method} $uri -> ${resp.statusCode}');
+    debugPrint(resp.body);
+
+    if (resp.statusCode != 200) {
+      final preview = resp.body.length > 400
+          ? '${resp.body.substring(0, 400)}…'
+          : resp.body;
+      throw Exception(
+        'Đăng nhập thất bại: ${resp.statusCode} ${resp.reasonPhrase}\n$preview',
+      );
+    }
+
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    final jwt = (data['token'] ?? data['jwt'] ?? '') as String;
+    if (jwt.isEmpty) throw Exception('Phản hồi backend không có token');
+
+    final Map<String, dynamic> userJson = (data['user'] is Map)
+        ? (data['user'] as Map).cast<String, dynamic>()
+        : const {};
+    final String userId = (data['id'] ?? userJson['id'] ?? '') as String;
+    final String userEmail =
+        (data['email'] ?? userJson['email'] ?? acc.email ?? '') as String;
+    final String userRole =
+        (data['role'] ?? userJson['role'] ?? 'user') as String;
+
+    final expiresAt =
+        _extractExpFromJwt(jwt) ?? DateTime.now().add(const Duration(hours: 6));
+
     final user = AppUser(
       id: userId,
       email: userEmail,
-      name:
-          acc.displayName ??
-          '', // chỉ dùng để hiển thị nếu server không trả name
+      name: acc.displayName ?? '',
       avatarUrl: acc.photoUrl,
       role: userRole,
     );
@@ -251,36 +155,32 @@ class AuthRepository {
     return (user, session);
   }
 
-  /// Logout an toàn:
-  /// - Dùng signOut() là đủ cho hầu hết case
-  /// - disconnect() chỉ khi muốn revoke scopes; bọc try/catch để tránh channel-error
   Future<void> logout() async {
     try {
       await _google.signOut();
     } catch (_) {}
-
-    // Chỉ revoke nếu thực sự cần (ít khi phải dùng)
     try {
       await _google.disconnect();
-    } catch (_) {
-      // Bỏ qua lỗi channel-error trên một số thiết bị
-    }
-
+    } catch (_) {}
     await clearSession();
   }
 
-  /// Giải mã 'exp' từ JWT (header.payload.sig)
+  static Future<void> clearSession() async {
+    await _prefs?.remove(_kJwt);
+    await _prefs?.remove(_kExp);
+  }
+
   DateTime? _extractExpFromJwt(String token) {
     try {
       final parts = token.split('.');
       if (parts.length != 3) return null;
-      final payload = parts[1];
-      final normalized = payload.padRight(
-        payload.length + (4 - payload.length % 4) % 4,
+      final payload = parts[1].padRight(
+        parts[1].length + (4 - parts[1].length % 4) % 4,
         '=',
       );
-      final jsonStr = utf8.decode(base64Url.decode(normalized));
-      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+      final map =
+          jsonDecode(utf8.decode(base64Url.decode(payload)))
+              as Map<String, dynamic>;
       final expSeconds = (map['exp'] as num?)?.toInt();
       if (expSeconds == null) return null;
       return DateTime.fromMillisecondsSinceEpoch(
@@ -292,8 +192,7 @@ class AuthRepository {
     }
   }
 
-  // ===== Tuỳ chọn: tạo client bypass SSL cho DEV (CHỈ DEBUG!) =====
-  // Dùng khi server dev tự-signed hoặc sai chain. TUYỆT ĐỐI KHÔNG dùng cho prod.
+  // DEV ONLY: bypass SSL self-signed (tuyệt đối không dùng cho prod)
   static http.Client createInsecureClient({required bool enable}) {
     if (!enable) return http.Client();
     final io = HttpClient()
@@ -302,14 +201,13 @@ class AuthRepository {
     return IOClient(io);
   }
 
-  /// Cập nhật số điện thoại theo userId (không cần token)
+  // ====== Các API khác giữ nguyên ======
+
   Future<void> updatePhoneById({
     required String userId,
     required String phone,
   }) async {
-    if (userId.isEmpty) {
-      throw ArgumentError('userId is empty');
-    }
+    if (userId.isEmpty) throw ArgumentError('userId is empty');
     final uri = Uri.parse('$baseUrl/update-phone-mobile');
     final headers = <String, String>{'Content-Type': 'application/json'};
 
@@ -318,10 +216,7 @@ class AuthRepository {
       headers: headers,
       body: jsonEncode({'id': userId, 'phone': phone}),
     );
-
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return;
-    }
+    if (resp.statusCode >= 200 && resp.statusCode < 300) return;
 
     try {
       final map = jsonDecode(resp.body) as Map<String, dynamic>;
@@ -335,7 +230,6 @@ class AuthRepository {
     }
   }
 
-  /// Cập nhật số điện thoại của tài khoản hiện tại
   Future<void> updatePhone(String phone, {String? bearerToken}) async {
     final uri = Uri.parse('$baseUrl/update-phone-mobile');
     final headers = <String, String>{'Content-Type': 'application/json'};
@@ -348,12 +242,8 @@ class AuthRepository {
       headers: headers,
       body: jsonEncode({'phone': phone}),
     );
+    if (resp.statusCode >= 200 && resp.statusCode < 300) return;
 
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return;
-    }
-
-    // Thử lấy message từ body nếu có
     try {
       final map = jsonDecode(resp.body) as Map<String, dynamic>;
       final msg = (map['message'] ?? map['error'] ?? resp.reasonPhrase)
@@ -366,12 +256,8 @@ class AuthRepository {
     }
   }
 
-  /// Lấy thông tin hồ sơ người dùng (email, phone, avatar...) theo userId
-  /// Backend chỉ nhận id (không cần token)
   Future<AppUser> getProfileById(String userId) async {
-    if (userId.isEmpty) {
-      throw ArgumentError('userId is empty');
-    }
+    if (userId.isEmpty) throw ArgumentError('userId is empty');
     final uri = Uri.parse('$baseUrl/me');
     final resp = await _client.post(
       uri,

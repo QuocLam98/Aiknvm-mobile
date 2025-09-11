@@ -1,63 +1,21 @@
-# ===== General =====
-*.class
-*.log
-*.pyc
-*.swp
-*.lock
+# Node / Expo / RN
+node_modules/
+.expo/
+.expo-shared/
+dist/
+.cache/
+.turbo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun.lockb
+
+# OS
 .DS_Store
-.env
-.svn/
-.history
-.vscode
+Thumbs.db
 
-# ===== IDE =====
-*.iml
-*.ipr
-*.iws
+# VSCode
+.vscode/**
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
-# .vscode/  # comment nếu muốn share setting VSCode
-
-# ===== Flutter / Dart / Pub =====
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
-build/
-coverage/
-**/doc/api/
-
-# ===== Android =====
-android/.gradle/
-android/local.properties
-android/key.properties
-android/app/debug/
-android/app/profile/
-android/app/release/
-**/GeneratedPluginRegistrant.java
-
-# Keystore/secret
-*.jks
-*.keystore
-
-# ===== iOS =====
-ios/Flutter/.last_build_id
-ios/Flutter/Flutter.framework
-ios/Flutter/Flutter.podspec
-ios/ServiceDefinitions.json
-ios/Runner/GeneratedPluginRegistrant.*
-
-# Xcode junk
-ios/Pods/
-ios/DerivedData/
-*.xcuserstate
-*.xcscmblueprint
-*.xccheckout
-*.xcworkspace/           # workspace người dùng
-**/*.xcworkspace/xcuserdata/
-**/*.xcodeproj/xcuserdata/
-
-# ===== Symbolication & Obfuscation =====
-app.*.symbols
-app.*.map.json

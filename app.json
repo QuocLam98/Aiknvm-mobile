@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Aiknvm",
+    "slug": "aiknvm-mobile",
+    "scheme": "aiknvm",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": true },
+    "android": {},
+    "extra": {
+      "API_BASE_URL": "${API_BASE_URL}",
+      "GOOGLE_WEB_CLIENT_ID": "${GOOGLE_WEB_CLIENT_ID}",
+  "GOOGLE_ANDROID_CLIENT_ID": "${GOOGLE_ANDROID_CLIENT_ID}",
+  "GOOGLE_IOS_CLIENT_ID": "${GOOGLE_IOS_CLIENT_ID}",
+      "DEFAULT_BOT": "${DEFAULT_BOT}",
+      "CREATE_IMAGE": "${CREATE_IMAGE}",
+      "CREATE_IMAGE_PREMIUM": "${CREATE_IMAGE_PREMIUM}"
+    }
+  }
+}

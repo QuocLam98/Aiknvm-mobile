@@ -10,13 +10,17 @@ export const env = {
   DEFAULT_BOT: String(extra.DEFAULT_BOT ?? process.env.DEFAULT_BOT ?? ''),
   CREATE_IMAGE: String(extra.CREATE_IMAGE ?? process.env.CREATE_IMAGE ?? '') === 'true',
   CREATE_IMAGE_PREMIUM: String(extra.CREATE_IMAGE_PREMIUM ?? process.env.CREATE_IMAGE_PREMIUM ?? '') === 'true',
+  DEBUG_HTTP: (extra.DEBUG_HTTP ?? process.env.DEBUG_HTTP ?? '') === 'true',
 };
 
 export function requireBaseUrl(): string {
   if (!env.API_BASE_URL) {
-    throw new Error('Missing API_BASE_URL in environment');
+    console.warn('[env] Missing API_BASE_URL – network calls will fail until set');
   }
   return env.API_BASE_URL;
+}
+export function hasBaseUrl() {
+  return !!env.API_BASE_URL;
 }
 export const ENV = {
   API_BASE_URL: process.env.API_BASE_URL || '',

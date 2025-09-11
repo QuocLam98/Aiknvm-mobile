@@ -1,10 +1,10 @@
 import React from 'react';
 import Center from '../components/Center';
-import { Button, ActivityIndicator } from 'react-native';
+import { Button, ActivityIndicator, Text } from 'react-native';
 import { useAuth } from '../controllers/useAuth';
 
 export default function Splash({ navigation }: any) {
-  const { user, loading } = useAuth();
+  const { user, loading, error } = useAuth();
   React.useEffect(() => {
     if (!loading) {
       if (user) navigation.replace('Home');
@@ -13,7 +13,8 @@ export default function Splash({ navigation }: any) {
   }, [loading, user, navigation]);
   return (
     <Center title="Splash">
-      {loading ? <ActivityIndicator /> : <Button title="Continue" onPress={() => navigation.replace('Login')} />}
+  {loading ? <ActivityIndicator /> : <Button title="Continue" onPress={() => navigation.replace('Login')} />}
+  {!!error && <Text style={{ marginTop: 12, color: 'red' }}>{error}</Text>}
     </Center>
   );
 }

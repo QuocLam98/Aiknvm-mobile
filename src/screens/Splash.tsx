@@ -6,10 +6,10 @@ import { useAuth } from '../controllers/useAuth';
 export default function Splash({ navigation }: any) {
   const { user, loading, error } = useAuth();
   React.useEffect(() => {
-    if (!loading) {
-      if (user) navigation.replace('Home');
-      else navigation.replace('Login');
-    }
+  if (loading) return;
+  if (error) console.warn('[Splash] auth error:', error);
+  if (user) navigation.replace('Home');
+  else navigation.replace('Login');
   }, [loading, user, navigation]);
   return (
     <Center title="Splash">

@@ -1,5 +1,5 @@
 import { requireBaseUrl, env } from '../config/env';
-import { AuthRepository } from '../repositories/authRepository';
+import { getToken } from './tokenStore';
 
 type HttpOptions = RequestInit & { timeoutMs?: number };
 
@@ -10,7 +10,7 @@ export async function http<T>(path: string, init?: HttpOptions): Promise<T> {
     throw new Error('NO_BASE_URL');
   }
   const url = base + (path.startsWith('/') ? path : `/${path}`);
-  const token = await AuthRepository.getToken();
+  const token = await getToken();
 
   const controller = new AbortController();
   const timeoutMs = init?.timeoutMs ?? 10000;

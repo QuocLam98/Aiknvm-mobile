@@ -1,8 +1,6 @@
-import * as SecureStore from 'expo-secure-store';
 import type { User } from '../models/user';
 import { http } from '../lib/http';
-
-const TOKEN_KEY = 'auth_token';
+import { saveToken, clearToken } from '../lib/tokenStore';
 
 export class AuthRepository {
   static async init() {
@@ -22,15 +20,11 @@ export class AuthRepository {
       method: 'POST',
       body: JSON.stringify({ idToken }),
     });
-    await SecureStore.setItemAsync(TOKEN_KEY, res.token);
+  await saveToken(res.token);
     return res;
   }
 
   async signOut(): Promise<void> {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
-  }
-
-  static async getToken(): Promise<string | null> {
-    return SecureStore.getItemAsync(TOKEN_KEY);
+  await clearToken();
   }
 }

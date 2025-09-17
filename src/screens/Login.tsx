@@ -15,7 +15,7 @@ export default function Login({ navigation }: any) {
       <Text style={styles.title}>Aiknvm</Text>
       <TouchableOpacity
         style={[styles.googleBtn, !request && styles.disabled]}
-        onPress={() => promptAsync()}
+  onPress={() => promptAsync()}
         disabled={!request}
         activeOpacity={0.8}
       >

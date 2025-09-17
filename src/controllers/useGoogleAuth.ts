@@ -8,15 +8,21 @@ import { AuthRepository } from '../repositories/authRepository';
 WebBrowser.maybeCompleteAuthSession();
 
 export function useGoogleAuth(onSuccess?: () => void, onError?: (e: unknown) => void) {
-  const redirectUri = makeRedirectUri({ scheme: 'aiknvm' });
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: env.GOOGLE_WEB_CLIENT_ID || undefined,
-    iosClientId: env.GOOGLE_IOS_CLIENT_ID || undefined,
-    androidClientId: env.GOOGLE_ANDROID_CLIENT_ID || undefined,
-    responseType: 'id_token',
-    redirectUri,
-    scopes: ['profile', 'email'],
-  });
+  const [request, response, promptAsync] = Google.useAuthRequest(
+    {
+      // For Expo Go you must use the Web Client ID
+      // Casting to any to avoid type friction across SDK versions
+      expoClientId: env.GOOGLE_WEB_CLIENT_ID || undefined,
+      iosClientId: env.GOOGLE_IOS_CLIENT_ID || undefined,
+      androidClientId: env.GOOGLE_ANDROID_CLIENT_ID || undefined,
+      responseType: 'id_token',
+      scopes: ['profile', 'email'],
+    } as any
+  );
+
+  // Helpful debug: print redirect URIs Expo will use
+  const debugRedirect = makeRedirectUri({ scheme: 'aiknvm' });
+  console.log('[GoogleAuth] redirectUri:', debugRedirect);
 
   useEffect(() => {
     const run = async () => {

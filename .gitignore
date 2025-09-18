@@ -60,4 +60,3 @@ ios/DerivedData/
 # ===== Symbolication & Obfuscation =====
 app.*.symbols
 app.*.map.json
-node_modules

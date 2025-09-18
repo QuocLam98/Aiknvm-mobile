@@ -79,8 +79,14 @@ class _ChatViewState extends State<ChatView> {
         // Ưu tiên bot CREATE_IMAGE trước
         if (imgId != null && imgId.isNotEmpty && id == imgId) {
           Navigator.pushReplacementNamed(context, '/chat_image', arguments: id);
-        } else if (imgPremiumId != null && imgPremiumId.isNotEmpty && id == imgPremiumId) {
-          Navigator.pushReplacementNamed(context, '/chat_image/premium', arguments: id);
+        } else if (imgPremiumId != null &&
+            imgPremiumId.isNotEmpty &&
+            id == imgPremiumId) {
+          Navigator.pushReplacementNamed(
+            context,
+            '/chat_image/premium',
+            arguments: id,
+          );
         } else {
           Navigator.pushReplacementNamed(context, '/chat', arguments: id);
         }
@@ -183,8 +189,10 @@ class _ChatViewState extends State<ChatView> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Lỗi: ${snapshot.error}',
-                      style: const TextStyle(color: Colors.red)),
+                  Text(
+                    'Lỗi: ${snapshot.error}',
+                    style: const TextStyle(color: Colors.red),
+                  ),
                   const SizedBox(height: 8),
                   FilledButton.icon(
                     onPressed: () => setState(() => _botFuture = _loadBot()),
@@ -226,7 +234,8 @@ class _ChatViewState extends State<ChatView> {
                                 ],
                               ),
                               clipBehavior: Clip.antiAlias,
-                              child: (bot.image != null && bot.image!.isNotEmpty)
+                              child:
+                                  (bot.image != null && bot.image!.isNotEmpty)
                                   ? Image.network(
                                       bot.image!,
                                       fit: BoxFit.cover,
@@ -256,11 +265,9 @@ class _ChatViewState extends State<ChatView> {
                                 : '',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.color
-                                  ?.withOpacity(.75),
+                              color: Theme.of(
+                                context,
+                              ).textTheme.bodyMedium?.color?.withOpacity(.75),
                             ),
                           ),
                           const Spacer(),
@@ -317,7 +324,13 @@ class _ChatViewState extends State<ChatView> {
                     onPressed: () async {
                       final result = await FilePicker.platform.pickFiles(
                         type: FileType.custom,
-                        allowedExtensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'],
+                        allowedExtensions: [
+                          'png',
+                          'jpg',
+                          'jpeg',
+                          'webp',
+                          'gif',
+                        ],
                       );
                       if (result != null && result.files.isNotEmpty) {
                         final f = result.files.first;
@@ -383,7 +396,10 @@ class _ChatViewState extends State<ChatView> {
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 320),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: bg,
                   borderRadius: BorderRadius.circular(16),
@@ -402,12 +418,17 @@ class _ChatViewState extends State<ChatView> {
                         tooltip: 'Sao chép',
                         splashRadius: 18,
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        constraints: const BoxConstraints(
+                          minWidth: 32,
+                          minHeight: 32,
+                        ),
                         onPressed: () async {
                           await Clipboard.setData(ClipboardData(text: m.text));
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Đã sao chép nội dung')),
+                              const SnackBar(
+                                content: Text('Đã sao chép nội dung'),
+                              ),
                             );
                           }
                         },
@@ -438,7 +459,8 @@ class _ChatViewState extends State<ChatView> {
                     child: Image.network(
                       _absUrl(m.fileUrl!),
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.broken_image),
                     ),
                   ),
                 ),
@@ -459,7 +481,10 @@ class _ChatViewState extends State<ChatView> {
                   borderRadius: BorderRadius.circular(16),
                   onTap: () => _onFileTap(_absUrl(m.fileUrl!), m.fileType),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: bg,
                       borderRadius: BorderRadius.circular(16),
@@ -490,8 +515,9 @@ class _ChatViewState extends State<ChatView> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Column(
-        crossAxisAlignment:
-            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isUser
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           for (int i = 0; i < blocks.length; i++) ...[
             if (i > 0) const SizedBox(height: 6),
@@ -506,14 +532,19 @@ class _ChatViewState extends State<ChatView> {
     final t = (fileType ?? '').toLowerCase();
     if (t.contains('image')) return true;
     final u = (url ?? '').toLowerCase();
-    return u.endsWith('.png') || u.endsWith('.jpg') || u.endsWith('.jpeg') || u.endsWith('.webp') || u.endsWith('.gif');
+    return u.endsWith('.png') ||
+        u.endsWith('.jpg') ||
+        u.endsWith('.jpeg') ||
+        u.endsWith('.webp') ||
+        u.endsWith('.gif');
   }
 
   IconData _iconForFileType(String? fileType, String? url) {
     final t = (fileType ?? '').toLowerCase();
     final u = (url ?? '').toLowerCase();
     if (t.contains('pdf') || u.endsWith('.pdf')) return Icons.picture_as_pdf;
-    if (t.contains('doc') || u.endsWith('.doc') || u.endsWith('.docx')) return Icons.description;
+    if (t.contains('doc') || u.endsWith('.doc') || u.endsWith('.docx'))
+      return Icons.description;
     if (t.contains('txt') || u.endsWith('.txt')) return Icons.description;
     return Icons.insert_drive_file;
   }
@@ -560,10 +591,8 @@ class _ChatViewState extends State<ChatView> {
                 child: Image.network(
                   url,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.broken_image,
-                    color: Colors.white,
-                  ),
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.broken_image, color: Colors.white),
                 ),
               ),
             ),
@@ -626,7 +655,9 @@ class _ChatViewState extends State<ChatView> {
 
   Future<Directory> _resolveDownloadDir() async {
     if (Platform.isAndroid) {
-      final dirs = await getExternalStorageDirectories(type: StorageDirectory.downloads);
+      final dirs = await getExternalStorageDirectories(
+        type: StorageDirectory.downloads,
+      );
       if (dirs != null && dirs.isNotEmpty) return dirs.first;
       final d = await getExternalStorageDirectory();
       if (d != null) return d;
@@ -651,14 +682,14 @@ class _ChatViewState extends State<ChatView> {
       await file.writeAsBytes(resp.bodyBytes);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã tải xuống: ${file.path}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Đã tải xuống: ${file.path}')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tải xuống thất bại')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Tải xuống thất bại')));
     }
   }
 }

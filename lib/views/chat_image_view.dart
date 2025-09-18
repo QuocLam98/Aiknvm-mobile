@@ -64,7 +64,11 @@ class _ChatImageViewState extends State<ChatImageView> {
       case DrawerKind.bot:
         if (key.id == null) return;
         if (key.id == widget.botId) return;
-        Navigator.pushReplacementNamed(context, '/chat_image', arguments: key.id!);
+        Navigator.pushReplacementNamed(
+          context,
+          '/chat_image',
+          arguments: key.id!,
+        );
         break;
       case DrawerKind.history:
         Navigator.pushNamed(context, '/history', arguments: key.id);
@@ -93,28 +97,44 @@ class _ChatImageViewState extends State<ChatImageView> {
         title: FutureBuilder<BotModel>(
           future: _botFuture,
           builder: (_, s) {
-            if (!s.hasData) return const Text('Đang tải...', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600));
+            if (!s.hasData)
+              return const Text(
+                'Đang tải...',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              );
             final bot = s.data!;
-            return Row(children: [
-              if (bot.image != null && bot.image!.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: Image.network(bot.image!, width: 28, height: 28, fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.smart_toy, color: Colors.black87)),
+            return Row(
+              children: [
+                if (bot.image != null && bot.image!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(
+                        bot.image!,
+                        width: 28,
+                        height: 28,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Icons.smart_toy, color: Colors.black87),
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: Text(
+                    bot.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
                   ),
                 ),
-              Expanded(
-                child: Text(
-                  bot.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  softWrap: false,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.black87),
-                ),
-              ),
-            ]);
+              ],
+            );
           },
         ),
       ),
@@ -167,7 +187,8 @@ class _ChatImageViewState extends State<ChatImageView> {
                         ? Image.network(
                             bot.image!,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.smart_toy, size: 64),
+                            errorBuilder: (_, __, ___) =>
+                                const Icon(Icons.smart_toy, size: 64),
                           )
                         : const ColoredBox(
                             color: Color(0xFFEFF3F8),
@@ -197,7 +218,9 @@ class _ChatImageViewState extends State<ChatImageView> {
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Theme.of(context).dividerColor.withOpacity(.4)),
+              border: Border.all(
+                color: Theme.of(context).dividerColor.withOpacity(.4),
+              ),
             ),
             child: Row(
               children: [
@@ -217,7 +240,13 @@ class _ChatImageViewState extends State<ChatImageView> {
                     FocusScope.of(context).unfocus();
                     // TODO: gửi tin nhắn text; bot phản hồi bằng ảnh
                   },
-                  style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12), shape: const StadiumBorder()),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    shape: const StadiumBorder(),
+                  ),
                   child: const Icon(Icons.send_rounded, size: 18),
                 ),
               ],

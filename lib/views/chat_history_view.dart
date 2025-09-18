@@ -78,8 +78,14 @@ class _HistoryChatViewState extends State<HistoryChatView> {
         // Ưu tiên bot CREATE_IMAGE trước
         if (imgId != null && imgId.isNotEmpty && id == imgId) {
           Navigator.pushReplacementNamed(context, '/chat_image', arguments: id);
-        } else if (imgPremiumId != null && imgPremiumId.isNotEmpty && id == imgPremiumId) {
-          Navigator.pushReplacementNamed(context, '/chat_image/premium', arguments: id);
+        } else if (imgPremiumId != null &&
+            imgPremiumId.isNotEmpty &&
+            id == imgPremiumId) {
+          Navigator.pushReplacementNamed(
+            context,
+            '/chat_image/premium',
+            arguments: id,
+          );
         } else {
           Navigator.pushReplacementNamed(context, '/chat', arguments: id);
         }
@@ -312,7 +318,10 @@ class _HistoryChatViewState extends State<HistoryChatView> {
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 320),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: bg,
                   borderRadius: BorderRadius.circular(16),
@@ -331,12 +340,17 @@ class _HistoryChatViewState extends State<HistoryChatView> {
                         tooltip: 'Sao chép',
                         splashRadius: 18,
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        constraints: const BoxConstraints(
+                          minWidth: 32,
+                          minHeight: 32,
+                        ),
                         onPressed: () async {
                           await Clipboard.setData(ClipboardData(text: m.text));
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Đã sao chép nội dung')),
+                              const SnackBar(
+                                content: Text('Đã sao chép nội dung'),
+                              ),
                             );
                           }
                         },
@@ -370,7 +384,8 @@ class _HistoryChatViewState extends State<HistoryChatView> {
                     child: Image.network(
                       _absUrl(m.fileUrl!),
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.broken_image),
                     ),
                   ),
                 ),
@@ -391,7 +406,10 @@ class _HistoryChatViewState extends State<HistoryChatView> {
                   borderRadius: BorderRadius.circular(16),
                   onTap: () => _onFileTap(_absUrl(m.fileUrl!), m.fileType),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: bg,
                       borderRadius: BorderRadius.circular(16),
@@ -422,8 +440,9 @@ class _HistoryChatViewState extends State<HistoryChatView> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Column(
-        crossAxisAlignment:
-            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isUser
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           for (int i = 0; i < blocks.length; i++) ...[
             if (i > 0) const SizedBox(height: 6),
@@ -438,14 +457,19 @@ class _HistoryChatViewState extends State<HistoryChatView> {
     final t = (fileType ?? '').toLowerCase();
     if (t.contains('image')) return true;
     final u = (url ?? '').toLowerCase();
-    return u.endsWith('.png') || u.endsWith('.jpg') || u.endsWith('.jpeg') || u.endsWith('.webp') || u.endsWith('.gif');
+    return u.endsWith('.png') ||
+        u.endsWith('.jpg') ||
+        u.endsWith('.jpeg') ||
+        u.endsWith('.webp') ||
+        u.endsWith('.gif');
   }
 
   IconData _iconForFileType(String? fileType, String? url) {
     final t = (fileType ?? '').toLowerCase();
     final u = (url ?? '').toLowerCase();
     if (t.contains('pdf') || u.endsWith('.pdf')) return Icons.picture_as_pdf;
-    if (t.contains('doc') || u.endsWith('.doc') || u.endsWith('.docx')) return Icons.description;
+    if (t.contains('doc') || u.endsWith('.doc') || u.endsWith('.docx'))
+      return Icons.description;
     if (t.contains('txt') || u.endsWith('.txt')) return Icons.description;
     return Icons.insert_drive_file;
   }
@@ -519,7 +543,9 @@ class _HistoryChatViewState extends State<HistoryChatView> {
 
   Future<Directory> _resolveDownloadDir() async {
     if (Platform.isAndroid) {
-      final dirs = await getExternalStorageDirectories(type: StorageDirectory.downloads);
+      final dirs = await getExternalStorageDirectories(
+        type: StorageDirectory.downloads,
+      );
       if (dirs != null && dirs.isNotEmpty) return dirs.first;
       final d = await getExternalStorageDirectory();
       if (d != null) return d;
@@ -544,14 +570,14 @@ class _HistoryChatViewState extends State<HistoryChatView> {
       await file.writeAsBytes(resp.bodyBytes);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã tải xuống: ${file.path}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Đã tải xuống: ${file.path}')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tải xuống thất bại')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Tải xuống thất bại')));
     }
   }
 
@@ -564,15 +590,15 @@ class _HistoryChatViewState extends State<HistoryChatView> {
       if (!ok) ok = await launchUrl(uri, mode: LaunchMode.inAppWebView);
       if (!ok) ok = await launchUrl(uri, mode: LaunchMode.platformDefault);
       if (!ok && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không mở được tệp.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Không mở được tệp.')));
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không mở được tệp.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Không mở được tệp.')));
       }
     }
   }
@@ -593,10 +619,8 @@ class _HistoryChatViewState extends State<HistoryChatView> {
                 child: Image.network(
                   url,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.broken_image,
-                    color: Colors.white,
-                  ),
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.broken_image, color: Colors.white),
                 ),
               ),
             ),

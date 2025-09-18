@@ -49,19 +49,34 @@ class AdminRepository {
       final data = root['data'] as Map;
       if (data['items'] is List) {
         listDyn = data['items'] as List;
-        total = _extractTotal(data) ?? _extractTotal(root) ?? _extractHeaderTotal(resp.headers) ?? listDyn.length;
+        total =
+            _extractTotal(data) ??
+            _extractTotal(root) ??
+            _extractHeaderTotal(resp.headers) ??
+            listDyn.length;
       } else if (data['list'] is List) {
         listDyn = data['list'] as List;
-        total = _extractTotal(data) ?? _extractTotal(root) ?? _extractHeaderTotal(resp.headers) ?? listDyn.length;
+        total =
+            _extractTotal(data) ??
+            _extractTotal(root) ??
+            _extractHeaderTotal(resp.headers) ??
+            listDyn.length;
       } else if (data['users'] is List) {
         listDyn = data['users'] as List;
-        total = _extractTotal(data) ?? _extractTotal(root) ?? _extractHeaderTotal(resp.headers) ?? listDyn.length;
+        total =
+            _extractTotal(data) ??
+            _extractTotal(root) ??
+            _extractHeaderTotal(resp.headers) ??
+            listDyn.length;
       } else {
         listDyn = [];
       }
     } else if (root is Map && root['data'] is List) {
       listDyn = root['data'] as List;
-      total = _extractTotal(root) ?? _extractHeaderTotal(resp.headers) ?? listDyn.length;
+      total =
+          _extractTotal(root) ??
+          _extractHeaderTotal(resp.headers) ??
+          listDyn.length;
     } else if (root is List) {
       listDyn = root;
       total = listDyn.length;
@@ -89,7 +104,14 @@ int? _asInt(dynamic v) {
 
 int? _extractTotal(Map m) {
   // try common keys at current level
-  for (final k in const ['total', 'count', 'totalCount', 'total_records', 'totalRecords', 'totalItems']) {
+  for (final k in const [
+    'total',
+    'count',
+    'totalCount',
+    'total_records',
+    'totalRecords',
+    'totalItems',
+  ]) {
     final t = _asInt(m[k]);
     if (t != null) return t;
   }

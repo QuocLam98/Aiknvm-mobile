@@ -2,16 +2,13 @@ import 'package:flutter/material.dart';
 import '../controllers/auth_controller.dart';
 import '../services/bot_repository.dart';
 
-
 class SplashView extends StatefulWidget {
   final AuthController auth;
   const SplashView({super.key, required this.auth});
 
-
   @override
   State<SplashView> createState() => _SplashViewState();
 }
-
 
 class _SplashViewState extends State<SplashView> {
   @override
@@ -19,7 +16,6 @@ class _SplashViewState extends State<SplashView> {
     super.initState();
     _boot();
   }
-
 
   Future<void> _boot() async {
     await widget.auth.restore();
@@ -33,7 +29,9 @@ class _SplashViewState extends State<SplashView> {
         for (final b in bots) {
           final url = b.image;
           if (url != null && url.isNotEmpty) {
-            futures.add(precacheImage(NetworkImage(url), context).catchError((_) {}));
+            futures.add(
+              precacheImage(NetworkImage(url), context).catchError((_) {}),
+            );
           }
         }
         if (futures.isNotEmpty) {
@@ -48,7 +46,6 @@ class _SplashViewState extends State<SplashView> {
       Navigator.of(context).pushReplacementNamed('/login');
     }
   }
-
 
   @override
   Widget build(BuildContext context) {

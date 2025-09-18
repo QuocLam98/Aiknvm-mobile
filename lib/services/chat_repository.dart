@@ -1,6 +1,8 @@
 // services/chat_repository.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../models/create_message_result.dart';
 
 import '../models/chat_message_model.dart';
 
@@ -10,6 +12,12 @@ class ChatRepository {
 
   ChatRepository(this.baseUrl, {http.Client? client})
     : _client = client ?? http.Client();
+
+  factory ChatRepository.fromEnv({http.Client? client}) {
+    final base = dotenv.env['API_BASE_URL'] ?? '';
+    if (base.isEmpty) throw StateError('Missing API_BASE_URL in .env');
+    return ChatRepository(base, client: client);
+  }
 
   Future<List<ChatMessageModel>> loadChatByHistoryId(
     String historyId, {
@@ -81,5 +89,49 @@ class ChatRepository {
     // messages.sort((a, b) => (a.createdAt ?? DateTime(0)).compareTo(b.createdAt ?? DateTime(0)));
 
     return messages;
+  }
+
+  Future<CreateMessageResult> createMessageMobile({
+    required String userId,
+    required String botId,
+    required String content,
+    String? file,
+    String? fileType,
+    String? historyChat,
+  }) async {
+    final uri = Uri.parse('$baseUrl/create-message-mobile');
+    final resp = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'id': userId,
+        'bot': botId,
+        'content': content,
+        if (file != null) 'file': file,
+        if (fileType != null) 'fileType': fileType,
+        if (historyChat != null) 'historyChat': historyChat,
+      }),
+    );
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception(
+        'POST $uri failed: ${resp.statusCode} ${resp.reasonPhrase}: ${resp.body}',
+      );
+    }
+    final decodedRaw = jsonDecode(resp.body);
+    if (decodedRaw is Map<String, dynamic>) {
+      // API may only return a message on error; detect lack of data fields
+      final hasId =
+          decodedRaw.containsKey('_id') || decodedRaw.containsKey('id');
+      final hasHistory = decodedRaw.containsKey('history');
+      final hasData = decodedRaw.containsKey('data');
+      if (!hasId &&
+          !hasHistory &&
+          decodedRaw.containsKey('message') &&
+          !hasData) {
+        throw Exception(decodedRaw['message']?.toString() ?? 'API error');
+      }
+      return CreateMessageResult.fromJson(decodedRaw);
+    }
+    throw Exception('Unexpected response: ${resp.body}');
   }
 }

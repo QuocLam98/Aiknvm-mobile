@@ -3,6 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/admin_user.dart';
+import '../models/admin_message.dart';
 
 class PagedResult<T> {
   final List<T> items;
@@ -86,9 +87,89 @@ class AdminRepository {
 
     final items = listDyn
         .whereType<Map>()
-        .map((e) => AdminUser.fromJson(Map<String, dynamic>.from(e as Map)))
+        .map((e) => AdminUser.fromJson(Map<String, dynamic>.from(e)))
         .toList();
     return PagedResult(items, total);
+  }
+
+  Future<PagedResult<AdminMessage>> listMessages({
+    int page = 1,
+    int limit = 10,
+    String search = '',
+  }) async {
+    final uri = Uri.parse('$baseUrl/list-message').replace(
+      queryParameters: {
+        'page': page.toString(),
+        'limit': limit.toString(),
+        if (search.isNotEmpty) 'search': search,
+      },
+    );
+
+    final resp = await _client.get(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+    );
+    if (resp.statusCode != 200) {
+      throw Exception('GET $uri -> ${resp.statusCode} ${resp.reasonPhrase}');
+    }
+
+    final root = jsonDecode(resp.body);
+    List<dynamic> listDyn;
+    int total = 0;
+    if (root is Map) {
+      if (root['data'] is List) {
+        listDyn = root['data'] as List;
+      } else if (root['items'] is List) {
+        listDyn = root['items'] as List;
+      } else {
+        listDyn = [];
+      }
+      total =
+          _extractTotal(root) ??
+          _extractHeaderTotal(resp.headers) ??
+          listDyn.length;
+    } else if (root is List) {
+      listDyn = root;
+      total = listDyn.length;
+    } else {
+      listDyn = [];
+    }
+
+    final items = listDyn
+        .whereType<Map>()
+        .map((e) => AdminMessage.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+    return PagedResult(items, total);
+  }
+
+  Future<AdminUser> updateUser({
+    required String id,
+    required String name,
+    required String email,
+    required double credit,
+    required String role,
+  }) async {
+    final uri = Uri.parse('$baseUrl/update-user/$id');
+    final resp = await _client.put(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'name': name,
+        'email': email,
+        'credit': credit,
+        'role': role,
+      }),
+    );
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception(
+        'PUT $uri -> ${resp.statusCode} ${resp.reasonPhrase}: ${resp.body}',
+      );
+    }
+    final root = jsonDecode(resp.body);
+    if (root is Map) {
+      return AdminUser.fromJson(Map<String, dynamic>.from(root));
+    }
+    throw Exception('Unexpected response shape for update-user: ${resp.body}');
   }
 }
 

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -8,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'controllers/auth_controller.dart';
 import 'services/auth_repository.dart';
 import 'routes.dart';
+import 'navigation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -90,6 +90,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(useMaterial3: true),
       initialRoute: '/',
       onGenerateRoute: (settings) => onGenerateRoute(settings, auth),
+      navigatorObservers: [routeObserver],
       onUnknownRoute: (_) => MaterialPageRoute(
         builder: (_) =>
             const Scaffold(body: Center(child: Text('Route not found'))),

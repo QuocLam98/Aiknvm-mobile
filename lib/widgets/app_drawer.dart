@@ -6,6 +6,7 @@ import '../controllers/history_controller.dart';
 import '../models/bot_model.dart';
 import '../models/history_message.dart';
 import '../widgets/drawer_key.dart';
+import '../controllers/app_events.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AppDrawer extends StatelessWidget {
@@ -32,7 +33,7 @@ class AppDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     final username = auth.user?.name ?? '';
     final email = auth.user?.email ?? '';
-    final role = auth.user?.role ?? 'user';
+    // final role = auth.user?.role ?? 'user';
 
     void _popThen(VoidCallback cb) {
       Navigator.of(context).pop();
@@ -152,7 +153,7 @@ class AppDrawer extends StatelessWidget {
                       label: 'Chat',
                       active: current.kind == DrawerKind.chat,
                       onTap: () => _popThen(() {
-                        Navigator.pushReplacementNamed(context, '/chat');
+                        Navigator.pushReplacementNamed(context, '/home');
                       }),
                     ),
 
@@ -174,31 +175,7 @@ class AppDrawer extends StatelessWidget {
                       }),
                     ),
 
-                    // Admin
-                    if (false && role == 'admin')
-                      _MenuGroup(
-                        icon: const Icon(Icons.shield_outlined),
-                        label: 'Danh sách cho Admin',
-                        labelColor: Colors.pink.shade400,
-                        children: [
-                          _SubItem(
-                            'Quản lý người dùng',
-                            onTap: () => _popThen(() {
-                              onSelect?.call(
-                                const DrawerKey(DrawerKind.adminUsers),
-                              );
-                            }),
-                          ),
-                          _SubItem(
-                            'Cấu hình hệ thống',
-                            onTap: () => _popThen(() {
-                              onSelect?.call(
-                                const DrawerKey(DrawerKind.adminConfig),
-                              );
-                            }),
-                          ),
-                        ],
-                      ),
+                    // Admin (tạm ẩn)
 
                     // Danh sách trợ lý AI
                     _MenuGroup(
@@ -207,95 +184,107 @@ class AppDrawer extends StatelessWidget {
                       maxListHeight: 220,
                       scrollable: true,
                       children: [
-                        FutureBuilder<List<BotModel>>(
-                          future: home.getAllBots(),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                child: Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              );
-                            }
-                            if (snapshot.hasError) {
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                  horizontal: 4,
-                                ),
-                                child: Text(
-                                  'Lỗi tải danh sách bot: ${snapshot.error}',
-                                  style: const TextStyle(color: Colors.red),
-                                ),
-                              );
-                            }
-                            final bots = snapshot.data ?? <BotModel>[];
-                            final defaultId = dotenv.env['DEFAULT_BOT']?.trim();
-                            final listBots = (defaultId == null || defaultId.isEmpty)
-                                ? bots
-                                : bots.where((b) => b.id != defaultId).toList();
+                        AnimatedBuilder(
+                          animation: AppEvents.instance,
+                          builder: (context, _) {
+                            return FutureBuilder<List<BotModel>>(
+                              future: home.reloadBots(),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    child: Center(
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  );
+                                }
+                                if (snapshot.hasError) {
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                      horizontal: 4,
+                                    ),
+                                    child: Text(
+                                      'Lỗi tải danh sách bot: ${snapshot.error}',
+                                      style: const TextStyle(color: Colors.red),
+                                    ),
+                                  );
+                                }
+                                final bots = snapshot.data ?? <BotModel>[];
+                                final defaultId = dotenv.env['DEFAULT_BOT']
+                                    ?.trim();
+                                final listBots =
+                                    (defaultId == null || defaultId.isEmpty)
+                                    ? bots
+                                    : bots
+                                          .where((b) => b.id != defaultId)
+                                          .toList();
 
-                            if (listBots.isEmpty) {
-                              return const Padding(
-                                padding: EdgeInsets.symmetric(
-                                  vertical: 12,
-                                  horizontal: 4,
-                                ),
-                                child: Text('Chưa có trợ lý nào'),
-                              );
-                            }
+                                if (listBots.isEmpty) {
+                                  return const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 12,
+                                      horizontal: 4,
+                                    ),
+                                    child: Text('Chưa có trợ lý nào'),
+                                  );
+                                }
 
-                            return AnimatedBuilder(
-                              animation: home,
-                              builder: (_, __) {
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: listBots.map((bot) {
-                                    final Widget leading =
-                                        (bot.image != null &&
-                                            bot.image!.isNotEmpty)
-                                        ? ClipRRect(
-                                            borderRadius: BorderRadius.circular(
-                                              6,
-                                            ),
-                                            child: Image.network(
-                                              bot.image!,
-                                              width: 22,
-                                              height: 22,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) =>
-                                                  const Icon(
-                                                    Icons.smart_toy_outlined,
-                                                  ),
-                                            ),
-                                          )
-                                        : const Icon(Icons.smart_toy_outlined);
+                                return AnimatedBuilder(
+                                  animation: home,
+                                  builder: (_, __) {
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: listBots.map((bot) {
+                                        final Widget leading =
+                                            (bot.image != null &&
+                                                bot.image!.isNotEmpty)
+                                            ? ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                                child: Image.network(
+                                                  bot.image!,
+                                                  width: 22,
+                                                  height: 22,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) =>
+                                                      const Icon(
+                                                        Icons
+                                                            .smart_toy_outlined,
+                                                      ),
+                                                ),
+                                              )
+                                            : const Icon(
+                                                Icons.smart_toy_outlined,
+                                              );
 
-                                    final isActive =
-                                        current.kind == DrawerKind.bot &&
-                                        current.id == bot.id;
+                                        final isActive =
+                                            current.kind == DrawerKind.bot &&
+                                            current.id == bot.id;
 
-                                    return _MenuItem(
-                                      icon: leading,
-                                      label: bot.name,
-                                      active: isActive,
-                                      onTap: () async {
-                                        await home.setBot(bot);
-                                        _popThen(() {
-                                          onSelect?.call(
-                                            DrawerKey(
-                                              DrawerKind.bot,
-                                              id: bot.id,
-                                            ),
-                                          );
-                                        });
-                                      },
+                                        return _MenuItem(
+                                          icon: leading,
+                                          label: bot.name,
+                                          active: isActive,
+                                          onTap: () async {
+                                            await home.setBot(bot);
+                                            _popThen(() {
+                                              onSelect?.call(
+                                                DrawerKey(
+                                                  DrawerKind.bot,
+                                                  id: bot.id,
+                                                ),
+                                              );
+                                            });
+                                          },
+                                        );
+                                      }).toList(),
                                     );
-                                  }).toList(),
+                                  },
                                 );
                               },
                             );
@@ -505,23 +494,6 @@ class _MenuGroup extends StatelessWidget {
         ),
         children: [childrenContainer],
       ),
-    );
-  }
-}
-
-class _SubItem extends StatelessWidget {
-  final String text;
-  final VoidCallback? onTap;
-
-  const _SubItem(this.text, {this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      title: Text(text),
-      onTap: onTap,
     );
   }
 }

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../controllers/auth_controller.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -43,13 +42,19 @@ class _LoginViewState extends State<LoginView> {
                       const SizedBox(height: 16),
                       const Text(
                         'Aiknvm',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                            'Ai kỷ nguyên vươn mình',
+                        'Ai kỷ nguyên vươn mình',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 24),
                       SizedBox(
@@ -59,19 +64,23 @@ class _LoginViewState extends State<LoginView> {
                           onPressed: auth.busy
                               ? null
                               : () async {
-                            final ok = await auth.loginWithGoogle();
-                            if (!mounted) return;
-                            if (ok) {
-                              Navigator.of(context).pushReplacementNamed('/home');
-                            }
-                          },
+                                  final ok = await auth.loginWithGoogle();
+                                  if (!mounted) return;
+                                  if (ok) {
+                                    Navigator.of(
+                                      context,
+                                    ).pushReplacementNamed('/home');
+                                  }
+                                },
                           icon: SvgPicture.asset(
-                            'assets/images/google.svg',     // <-- dùng SVG asset
+                            'assets/images/google.svg', // <-- dùng SVG asset
                             width: 20,
                             height: 20,
                             fit: BoxFit.contain,
                           ),
-                          label: Text(auth.busy ? 'Đang xử lý…' : 'Đăng nhập với Google'),
+                          label: Text(
+                            auth.busy ? 'Đang xử lý…' : 'Đăng nhập với Google',
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: Colors.black87,
@@ -84,7 +93,10 @@ class _LoginViewState extends State<LoginView> {
                       ),
                       if (auth.error != null) ...[
                         const SizedBox(height: 12),
-                        Text(auth.error!, style: const TextStyle(color: Colors.red)),
+                        Text(
+                          auth.error!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
                       ],
                     ],
                   );

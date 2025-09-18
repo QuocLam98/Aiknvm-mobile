@@ -25,7 +25,17 @@ class HomeController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _bot = await _repo.getDefaultBot();
+      try {
+        _bot = await _repo.getDefaultBot();
+      } on StateError catch (_) {
+        // DEFAULT_BOT missing -> fallback to first available bot
+        final list = await _repo.getAllBots();
+        if (list.isNotEmpty) {
+          _bot = list.first;
+        } else {
+          throw Exception('Không có trợ lý khả dụng');
+        }
+      }
     } catch (e) {
       _error = e.toString();
     } finally {

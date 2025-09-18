@@ -41,7 +41,7 @@ class _SplashViewState extends State<SplashView> {
         // Bỏ qua lỗi prefetch để không chặn vào app
       }
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed('/chat');
+      Navigator.of(context).pushReplacementNamed('/home');
     } else {
       Navigator.of(context).pushReplacementNamed('/login');
     }

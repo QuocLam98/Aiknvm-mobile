@@ -81,7 +81,7 @@ class AuthController extends ChangeNotifier {
 
   Future<void> logout() async {
     try {
-      await _repo.logout();
+      await AuthRepository.clearSession();
     } finally {
       _user = null;
       _session = null;

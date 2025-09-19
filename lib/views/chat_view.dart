@@ -37,6 +37,12 @@ class _ChatViewState extends State<ChatView> {
   final _inputCtrl = TextEditingController();
   late Future<BotModel> _botFuture;
 
+  String _shortName(String name) {
+    final t = name.trim();
+    if (t.length <= 18) return t;
+    return t.substring(0, 16) + '…';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -150,15 +156,19 @@ class _ChatViewState extends State<ChatView> {
                     ),
                   ),
                 Expanded(
-                  child: Text(
-                    bot.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
+                  child: Tooltip(
+                    message: bot.name,
+                    waitDuration: const Duration(milliseconds: 400),
+                    child: Text(
+                      _shortName(bot.name),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ),

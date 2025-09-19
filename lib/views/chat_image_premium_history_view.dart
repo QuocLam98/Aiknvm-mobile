@@ -1,282 +1,180 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import '../models/chat_message_model.dart';
-import '../services/chat_repository.dart';
-import 'dart:io';
-import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-// Removed unused imports
-
+import 'package:http/http.dart' as http;
 import '../controllers/auth_controller.dart';
 import '../controllers/home_controller.dart';
 import '../controllers/history_controller.dart';
 import '../models/bot_model.dart';
+import '../models/chat_message_model.dart';
+import '../services/chat_repository.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/drawer_key.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-class ChatImagePremiumView extends StatefulWidget {
+class ChatImagePremiumHistoryView extends StatefulWidget {
   final AuthController auth;
   final HomeController home;
   final HistoryController history;
+  final String historyId;
   final String? botId;
-
-  const ChatImagePremiumView({
+  const ChatImagePremiumHistoryView({
     super.key,
     required this.auth,
     required this.home,
     required this.history,
+    required this.historyId,
     this.botId,
   });
 
   @override
-  State<ChatImagePremiumView> createState() => _ChatImagePremiumViewState();
+  State<ChatImagePremiumHistoryView> createState() =>
+      _ChatImagePremiumHistoryViewState();
 }
 
-class _ChatImagePremiumViewState extends State<ChatImagePremiumView> {
+class _ChatImagePremiumHistoryViewState
+    extends State<ChatImagePremiumHistoryView> {
   final _inputCtrl = TextEditingController();
-  late Future<BotModel> _botFuture;
-  final ScrollController _listCtrl = ScrollController();
   final List<ChatMessageModel> _messages = [];
+  final ScrollController _listCtrl = ScrollController();
+  late Future<BotModel> _botFuture;
   bool _sending = false;
   String? _historyId;
   File? _selectedImage;
-  // Removed fixed history loading: always start new chat
-
-  String _shortName(String name) {
-    final t = name.trim();
-    if (t.length <= 18) return t;
-    return t.substring(0, 16) + '…';
-  }
 
   @override
   void initState() {
     super.initState();
-    _botFuture = _loadBot();
-    // No fixed history: start fresh
+    _historyId = widget.historyId;
+    _botFuture = _initHistoryAndBot();
   }
 
-  Future<BotModel> _loadBot() async {
-    if (widget.botId != null && widget.botId!.isNotEmpty) {
-      final bot = await widget.home.loadBotById(widget.botId!);
-      await widget.home.setBot(bot);
-      return bot;
-    }
-    await widget.home.loadDefaultBot();
-    final bot = widget.home.bot;
-    if (bot == null) throw Exception('Không lấy được bot mặc định');
-    await widget.home.setBot(bot);
-    return bot;
-  }
-
-  void _handleDrawerSelect(DrawerKey key) {
-    switch (key.kind) {
-      case DrawerKind.chat:
-        Navigator.pushReplacementNamed(context, '/chat');
-        break;
-      case DrawerKind.usage:
-        Navigator.pushNamed(context, '/usage');
-        break;
-      case DrawerKind.adminUsers:
-        Navigator.pushNamed(context, '/admin/users');
-        break;
-      case DrawerKind.adminConfig:
-        Navigator.pushNamed(context, '/admin/config');
-        break;
-      case DrawerKind.bot:
-        if (key.id == null) return;
-        final id = key.id!;
-        if (id == widget.botId) return;
-        final imgId = dotenv.env['CREATE_IMAGE']?.trim();
-        final imgPremiumId = dotenv.env['CREATE_IMAGE_PREMIUM']?.trim();
-        if (imgId != null && imgId.isNotEmpty && id == imgId) {
-          Navigator.pushReplacementNamed(context, '/chat_image', arguments: id);
-        } else if (imgPremiumId != null &&
-            imgPremiumId.isNotEmpty &&
-            id == imgPremiumId) {
-          Navigator.pushReplacementNamed(
-            context,
-            '/chat_image/premium',
-            arguments: id,
-          );
-        } else {
-          Navigator.pushReplacementNamed(context, '/chat', arguments: id);
+  Future<BotModel> _initHistoryAndBot() async {
+    try {
+      final repo = ChatRepository.fromEnv();
+      final list = await repo.loadChatByHistoryId(widget.historyId, limit: 80);
+      // Extract botId from messages if any
+      String? botId = widget.botId;
+      for (final m in list) {
+        if (m.botId != null && m.botId!.isNotEmpty) {
+          botId = m.botId;
+          break;
         }
-        break;
-      case DrawerKind.history:
-        Navigator.pushNamed(context, '/history', arguments: key.id);
-        break;
+      }
+      BotModel bot;
+      if (botId != null && botId.isNotEmpty) {
+        bot = await widget.home.loadBotById(botId);
+      } else {
+        await widget.home.loadDefaultBot();
+        bot = widget.home.bot!;
+      }
+      await widget.home.setBot(bot);
+      if (!mounted) return bot;
+      setState(() {
+        _messages
+          ..clear()
+          ..addAll(list);
+      });
+      await Future.delayed(const Duration(milliseconds: 40));
+      if (_listCtrl.hasClients) {
+        _listCtrl.jumpTo(_listCtrl.position.maxScrollExtent);
+      }
+      return bot;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Tải lịch sử thất bại: $e')));
+      }
+      rethrow;
     }
   }
 
-  @override
-  void dispose() {
-    _inputCtrl.dispose();
-    _listCtrl.dispose();
-    super.dispose();
-  }
+  // _transformToImageConversation no longer needed; handled in model.
 
-  @override
-  Widget build(BuildContext context) {
-    final auth = widget.auth;
-    final home = widget.home;
-    final history = widget.history;
-
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: .5,
-        iconTheme: const IconThemeData(color: Colors.black87),
-        title: FutureBuilder<BotModel>(
-          future: _botFuture,
-          builder: (_, s) {
-            if (!s.hasData)
-              return const Text(
-                'Đang tải...',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              );
-            final bot = s.data!;
-            return Row(
-              children: [
-                if (bot.image != null && bot.image!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: Image.network(
-                        bot.image!,
-                        width: 28,
-                        height: 28,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.smart_toy, color: Colors.black87),
-                      ),
-                    ),
-                  ),
-                Expanded(
-                  child: Tooltip(
-                    message: bot.name,
-                    waitDuration: const Duration(milliseconds: 400),
-                    child: Text(
-                      _shortName(bot.name),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      softWrap: false,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-      drawer: AppDrawer(
-        auth: auth,
-        home: home,
-        history: history,
-        current: (widget.botId != null && widget.botId!.isNotEmpty)
-            ? DrawerKey(DrawerKind.bot, id: widget.botId)
-            : const DrawerKey(DrawerKind.chat),
-        onSelect: _handleDrawerSelect,
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: FutureBuilder<BotModel>(
-              future: _botFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'Lỗi: ${snapshot.error}',
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  );
-                }
-                return ListView.builder(
-                  controller: _listCtrl,
-                  padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
-                  itemCount: _messages.length,
-                  itemBuilder: (_, i) {
-                    final m = _messages[i];
-                    final isUser = m.role == 'user';
-                    return _bubble(m, isUser: isUser);
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-        child: Material(
-          elevation: 3,
-          borderRadius: BorderRadius.circular(14),
-          clipBehavior: Clip.antiAlias,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: Theme.of(context).dividerColor.withOpacity(.4),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _inputCtrl,
-                    minLines: 1,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      hintText: 'Nhập tin nhắn...',
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ),
-                // Ảnh
-                _buildImageButton(),
-                FilledButton(
-                  onPressed: _sending
-                      ? null
-                      : () {
-                          FocusScope.of(context).unfocus();
-                          final text = _inputCtrl.text.trim();
-                          if (text.isEmpty && _selectedImage == null) return;
-                          _send(text);
-                        },
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    shape: const StadiumBorder(),
-                  ),
-                  child: _sending
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.send_rounded, size: 18),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+  Future<void> _send(String text) async {
+    final userId = widget.auth.user?.id;
+    final botId = widget.home.bot?.id;
+    if (userId == null || botId == null || userId.isEmpty || botId.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Thiếu user hoặc bot')));
+      return;
+    }
+    if (_selectedImage == null && text.isEmpty) return;
+    setState(() => _sending = true);
+    final upload = _selectedImage;
+    final localUserMsg = ChatMessageModel(
+      id: 'local_${DateTime.now().millisecondsSinceEpoch}_u',
+      text: text.isEmpty && upload != null ? '(đã chọn ảnh)' : text,
+      role: 'user',
+      createdAt: DateTime.now(),
+      botId: botId,
+      fileUrl: upload?.path,
+      fileType: upload != null ? 'image/local' : null,
     );
+    ChatMessageModel? placeholder;
+    setState(() {
+      _messages.add(localUserMsg);
+      placeholder = ChatMessageModel(
+        id: 'placeholder_${DateTime.now().millisecondsSinceEpoch}',
+        text: '…',
+        role: 'bot',
+        createdAt: DateTime.now(),
+        botId: botId,
+      );
+      _messages.add(placeholder!);
+      _inputCtrl.clear();
+      _selectedImage = null;
+    });
+    try {
+      final repo = ChatRepository.fromEnv();
+      final res = await repo.createMessageImagePremium(
+        userId: userId,
+        botId: botId,
+        content: text.isEmpty ? ' ' : text,
+        historyChat: _historyId,
+        file: upload,
+      );
+      if (!mounted) return;
+      setState(() {
+        _historyId ??= res.history; // already exists
+        final idx = placeholder == null
+            ? -1
+            : _messages.indexWhere((m) => m.id == placeholder!.id);
+        final isLikelyUrl =
+            res.contentBot.startsWith('http://') ||
+            res.contentBot.startsWith('https://');
+        final botMsg = ChatMessageModel(
+          id: '${res.id}_b',
+          text: isLikelyUrl ? '' : res.contentBot,
+          role: 'bot',
+          createdAt: res.createdAt,
+          fileUrl: isLikelyUrl ? res.contentBot : null,
+          fileType: isLikelyUrl ? 'image/auto' : null,
+          botId: botId,
+        );
+        if (idx >= 0) {
+          _messages[idx] = botMsg;
+        } else {
+          _messages.add(botMsg);
+        }
+      });
+      try {
+        await widget.history.refreshHistory();
+      } catch (_) {}
+      await Future.delayed(const Duration(milliseconds: 30));
+      if (_listCtrl.hasClients) {
+        _listCtrl.jumpTo(_listCtrl.position.maxScrollExtent);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gửi thất bại: $e')));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   Widget _buildImageButton() {
@@ -327,101 +225,6 @@ class _ChatImagePremiumViewState extends State<ChatImagePremiumView> {
             },
       icon: const Icon(Icons.image_outlined),
     );
-  }
-
-  Future<void> _send(String text) async {
-    final userId = widget.auth.user?.id;
-    final botId = widget.home.bot?.id;
-    if (userId == null || userId.isEmpty || botId == null || botId.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Thiếu user hoặc bot')));
-      return;
-    }
-    setState(() => _sending = true);
-    final prevHistory = _historyId; // capture current history (if any)
-    final upload = _selectedImage;
-    final localUserMsg = ChatMessageModel(
-      id: 'local_${DateTime.now().millisecondsSinceEpoch}_u',
-      text: text.isEmpty && upload != null ? '(đã chọn ảnh)' : text,
-      role: 'user',
-      createdAt: DateTime.now(),
-      botId: botId,
-      fileUrl: upload?.path,
-      fileType: upload != null ? 'image/local' : null,
-    );
-    ChatMessageModel? placeholder;
-    setState(() {
-      _messages.add(localUserMsg);
-      placeholder = ChatMessageModel(
-        id: 'placeholder_${DateTime.now().millisecondsSinceEpoch}',
-        text: '…',
-        role: 'bot',
-        createdAt: DateTime.now(),
-        botId: botId,
-      );
-      _messages.add(placeholder!);
-      _inputCtrl.clear();
-      _selectedImage = null;
-    });
-    try {
-      final repo = ChatRepository.fromEnv();
-      final res = await repo.createMessageImagePremium(
-        userId: userId,
-        botId: botId,
-        content: text.isEmpty ? ' ' : text,
-        historyChat: _historyId,
-        file: upload,
-      );
-      if (!mounted) return;
-      setState(() {
-        _historyId ??= res.history;
-        final idx = placeholder == null
-            ? -1
-            : _messages.indexWhere((m) => m.id == placeholder!.id);
-        final isLikelyUrl =
-            res.contentBot.startsWith('http://') ||
-            res.contentBot.startsWith('https://');
-        final botMsg = ChatMessageModel(
-          id: '${res.id}_b',
-          text: isLikelyUrl ? '' : res.contentBot,
-          role: 'bot',
-          createdAt: res.createdAt,
-          fileUrl: isLikelyUrl ? res.contentBot : null,
-          fileType: isLikelyUrl ? 'image/auto' : null,
-          botId: botId,
-        );
-        if (idx >= 0) {
-          _messages[idx] = botMsg;
-        } else {
-          _messages.add(botMsg);
-        }
-      });
-      if (_historyId != null &&
-          _historyId!.isNotEmpty &&
-          (prevHistory == null || prevHistory.isEmpty)) {
-        try {
-          await repo.updateMessageHistory(
-            messageId: res.id,
-            historyId: _historyId!,
-          );
-        } catch (_) {}
-        try {
-          await widget.history.refreshHistory();
-        } catch (_) {}
-      }
-      await Future.delayed(const Duration(milliseconds: 30));
-      if (_listCtrl.hasClients) {
-        _listCtrl.jumpTo(_listCtrl.position.maxScrollExtent);
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Gửi thất bại: $e')));
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
   }
 
   Widget _bubble(ChatMessageModel m, {required bool isUser}) {
@@ -619,6 +422,228 @@ class _ChatImagePremiumViewState extends State<ChatImagePremiumView> {
         context,
       ).showSnackBar(SnackBar(content: Text('Tải xuống thất bại: $e')));
     }
+  }
+
+  Widget _buildImageToolbar() {
+    return Row(children: [_buildImageButton(), const SizedBox(width: 4)]);
+  }
+
+  @override
+  void dispose() {
+    _inputCtrl.dispose();
+    _listCtrl.dispose();
+    super.dispose();
+  }
+
+  String _shortName(String name) {
+    final t = name.trim();
+    if (t.length <= 18) return t;
+    return t.substring(0, 16) + '…';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = widget.auth;
+    final home = widget.home;
+    final history = widget.history;
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: .5,
+        iconTheme: const IconThemeData(color: Colors.black87),
+        title: FutureBuilder<BotModel>(
+          future: _botFuture,
+          builder: (_, s) {
+            if (!s.hasData) {
+              return const Text(
+                'Đang tải...',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              );
+            }
+            final bot = s.data!;
+            return Row(
+              children: [
+                if (bot.image != null && bot.image!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(
+                        bot.image!,
+                        width: 28,
+                        height: 28,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Icons.smart_toy, color: Colors.black87),
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: Tooltip(
+                    message: bot.name,
+                    waitDuration: const Duration(milliseconds: 400),
+                    child: Text(
+                      _shortName(bot.name),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+      drawer: AppDrawer(
+        auth: auth,
+        home: home,
+        history: history,
+        current: DrawerKey(DrawerKind.history, id: widget.historyId),
+        onSelect: (k) {
+          switch (k.kind) {
+            case DrawerKind.history:
+              if (k.id != null) {
+                Navigator.pushReplacementNamed(
+                  context,
+                  '/history',
+                  arguments: k.id,
+                );
+              }
+              break;
+            case DrawerKind.chat:
+              Navigator.pushReplacementNamed(context, '/chat');
+              break;
+            case DrawerKind.bot:
+              if (k.id != null) {
+                Navigator.pushReplacementNamed(
+                  context,
+                  '/chat',
+                  arguments: k.id,
+                );
+              }
+              break;
+            case DrawerKind.usage:
+              Navigator.pushNamed(context, '/usage');
+              break;
+            case DrawerKind.adminUsers:
+              Navigator.pushNamed(context, '/admin/users');
+              break;
+            case DrawerKind.adminConfig:
+              Navigator.pushNamed(context, '/admin/config');
+              break;
+          }
+        },
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: FutureBuilder<BotModel>(
+              future: _botFuture,
+              builder: (_, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snap.hasError) {
+                  return Center(
+                    child: Text(
+                      'Lỗi: ${snap.error}',
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  );
+                }
+                if (_messages.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'Chưa có tin nhắn trong lịch sử này',
+                      style: TextStyle(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withOpacity(.6),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  controller: _listCtrl,
+                  padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
+                  itemCount: _messages.length,
+                  itemBuilder: (_, i) {
+                    final m = _messages[i];
+                    final isUser = m.role == 'user';
+                    return _bubble(m, isUser: isUser);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+        child: Material(
+          elevation: 3,
+          borderRadius: BorderRadius.circular(14),
+          clipBehavior: Clip.antiAlias,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: Theme.of(context).dividerColor.withOpacity(.4),
+              ),
+            ),
+            child: Row(
+              children: [
+                _buildImageToolbar(),
+                Expanded(
+                  child: TextField(
+                    controller: _inputCtrl,
+                    minLines: 1,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      hintText: 'Nhập tin nhắn...',
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                FilledButton(
+                  onPressed: _sending
+                      ? null
+                      : () {
+                          FocusScope.of(context).unfocus();
+                          final text = _inputCtrl.text.trim();
+                          if (text.isEmpty && _selectedImage == null) return;
+                          _send(text);
+                        },
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: _sending
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send_rounded, size: 18),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

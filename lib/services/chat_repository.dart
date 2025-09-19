@@ -2,9 +2,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http_parser/http_parser.dart';
 import '../models/create_message_result.dart';
 
 import '../models/chat_message_model.dart';
+import 'dart:io';
 
 class ChatRepository {
   final String baseUrl;
@@ -24,70 +26,75 @@ class ChatRepository {
     int page = 1,
     int limit = 20,
   }) async {
-    final uri = Uri.parse(
-      '$baseUrl/list-message-mobile?page=$page&limit=$limit&id=$historyId',
-    );
+    Future<http.Response> _attemptGet(String paramName) {
+      final uri = Uri.parse(
+        '$baseUrl/list-message-mobile?page=$page&limit=$limit&$paramName=$historyId',
+      );
+      return _client.get(uri, headers: {'Content-Type': 'application/json'});
+    }
 
-    final resp = await _client.get(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-    );
-
+    http.Response? resp;
+    String step = 'get_id';
+    resp = await _attemptGet('id');
+    if (resp.statusCode == 422) {
+      // Try alternate param name 'history'
+      step = 'get_history';
+      resp = await _attemptGet('history');
+    }
+    if (resp.statusCode == 422) {
+      // Some backends may require POST with body
+      step = 'post_body';
+      final uri = Uri.parse('$baseUrl/list-message-mobile');
+      resp = await _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'id': historyId, 'page': page, 'limit': limit}),
+      );
+    }
     if (resp.statusCode != 200) {
       throw Exception(
-        'GET $uri failed: ${resp.statusCode} ${resp.reasonPhrase}',
+        'list-message-mobile ($step) failed: ${resp.statusCode} ${resp.reasonPhrase} - ${resp.body}',
       );
     }
 
-    final root = jsonDecode(resp.body) as Map<String, dynamic>;
-    if (root['status'] != 200) {
-      throw Exception('API error: ${root['message']}');
+    dynamic root;
+    try {
+      root = jsonDecode(resp.body);
+    } catch (e) {
+      throw Exception('Parse error ($step): ${resp.body}');
     }
 
-    final List<dynamic> list = root['data'] ?? const [];
+    List<dynamic> dataList;
+    if (root is Map<String, dynamic>) {
+      // Accept different envelope shapes
+      if (root['status'] != null && root['status'] != 200) {
+        throw Exception('API error ($step): ${root['message']}');
+      }
+      if (root['data'] is List) {
+        dataList = root['data'] as List;
+      } else if (root['items'] is List) {
+        dataList = root['items'] as List;
+      } else if (root['messages'] is List) {
+        dataList = root['messages'] as List;
+      } else {
+        // Maybe backend returned a single object; wrap it
+        dataList = [];
+      }
+    } else if (root is List) {
+      dataList = root;
+    } else {
+      dataList = [];
+    }
+
     final messages = <ChatMessageModel>[];
-
-    for (final raw in list) {
-      final Map<String, dynamic> j = Map<String, dynamic>.from(raw as Map);
-
-      final String baseId = (j['_id'] ?? j['id'] ?? '').toString();
-      final String userText = (j['contentUser'] ?? '').toString();
-      final String botText = (j['contentBot'] ?? '').toString();
-      final String fileUrl = (j['fileUser'] ?? '').toString();
-      final String fileType = (j['fileType'] ?? '').toString();
-      final DateTime? createdAt = j['createdAt'] != null
-          ? DateTime.tryParse(j['createdAt'].toString())
-          : null;
-
-      // record -> (user message) + (bot message) nếu có nội dung
-      if (userText.isNotEmpty || fileUrl.isNotEmpty) {
-        messages.add(
-          ChatMessageModel(
-            id: '${baseId}_u',
-            text: userText,
-            role: 'user',
-            createdAt: createdAt,
-            fileUrl: fileUrl.isNotEmpty ? fileUrl : null,
-            fileType: fileType.isNotEmpty ? fileType : null,
-          ),
+    for (final raw in dataList) {
+      if (raw is Map) {
+        final expanded = ChatMessageModel.expandFromServer(
+          Map<String, dynamic>.from(raw),
         );
-      }
-      if (botText.isNotEmpty) {
-        messages.add(
-          ChatMessageModel(
-            id: '${baseId}_b',
-            text: botText,
-            role: 'bot', // hoặc 'assistant' tuỳ UI bạn check
-            createdAt: createdAt,
-          ),
-        );
+        messages.addAll(expanded);
       }
     }
-
-    // BE đang sort desc theo createdAt; danh sách đã theo thứ tự từ API
-    // Nếu cần đảm bảo, có thể sort nhẹ:
-    // messages.sort((a, b) => (a.createdAt ?? DateTime(0)).compareTo(b.createdAt ?? DateTime(0)));
-
     return messages;
   }
 
@@ -100,17 +107,23 @@ class ChatRepository {
     String? historyChat,
   }) async {
     final uri = Uri.parse('$baseUrl/create-message-mobile');
+    // Build body map explicitly so we can log and verify values before sending.
+    final bodyMap = <String, dynamic>{
+      'id': userId,
+      'bot': botId,
+      'content': content,
+    };
+    // Only include optional fields when they have a non-empty value
+    if (file != null && file.isNotEmpty) bodyMap['file'] = file;
+    if (fileType != null && fileType.isNotEmpty) bodyMap['fileType'] = fileType;
+    if (historyChat != null && historyChat.isNotEmpty) {
+      bodyMap['historyChat'] = historyChat;
+    }
+    // ignore: avoid_print
     final resp = await _client.post(
       uri,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'id': userId,
-        'bot': botId,
-        'content': content,
-        if (file != null) 'file': file,
-        if (fileType != null) 'fileType': fileType,
-        if (historyChat != null) 'historyChat': historyChat,
-      }),
+      body: jsonEncode(bodyMap),
     );
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
       throw Exception(
@@ -133,5 +146,218 @@ class ChatRepository {
       return CreateMessageResult.fromJson(decodedRaw);
     }
     throw Exception('Unexpected response: ${resp.body}');
+  }
+
+  /// Create an image chat message (image generated by bot) via
+  /// POST /create-message-image-mobile
+  /// Body: { id, bot, content, (optional) historyChat }
+  /// Response (success or credit exhausted) returns a flat JSON object containing
+  /// at least: _id, history, contentBot, createdAt, (optional) status, (optional) file
+  Future<CreateMessageResult> createMessageImageMobile({
+    required String userId,
+    required String botId,
+    required String content,
+    String? historyChat,
+  }) async {
+    final uri = Uri.parse('$baseUrl/create-message-image-mobile');
+    final bodyMap = <String, dynamic>{
+      'id': userId,
+      'bot': botId,
+      'content': content,
+    };
+    if (historyChat != null && historyChat.isNotEmpty) {
+      bodyMap['historyChat'] = historyChat;
+    }
+
+    final resp = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(bodyMap),
+    );
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception(
+        'POST $uri failed: ${resp.statusCode} ${resp.reasonPhrase}: ${resp.body}',
+      );
+    }
+    final decodedRaw = jsonDecode(resp.body);
+    if (decodedRaw is Map<String, dynamic>) {
+      // Endpoint returns a flat map (no mandatory data wrapper) so reuse CreateMessageResult
+      return CreateMessageResult.fromJson(decodedRaw);
+    }
+    throw Exception('Unexpected response: ${resp.body}');
+  }
+
+  /// Create a premium image chat message. Supports optional image file upload (edit mode).
+  /// Endpoint: POST /create-message-image-pre
+  /// If [file] provided uses multipart/form-data, else JSON body.
+  Future<CreateMessageResult> createMessageImagePremium({
+    required String userId,
+    required String botId,
+    required String content,
+    String? historyChat,
+    File? file,
+  }) async {
+    final uri = Uri.parse('$baseUrl/create-message-image-pre');
+    if (file != null) {
+      final req = http.MultipartRequest('POST', uri);
+      req.fields['id'] = userId;
+      req.fields['bot'] = botId;
+      req.fields['content'] = content;
+      if (historyChat != null && historyChat.isNotEmpty) {
+        req.fields['historyChat'] = historyChat;
+      }
+      final mime = _inferMime(file.path);
+      req.files.add(
+        await http.MultipartFile.fromPath('file', file.path, contentType: mime),
+      );
+      final streamed = await req.send();
+      final resp = await http.Response.fromStream(streamed);
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        throw Exception(
+          'POST $uri failed: ${resp.statusCode} ${resp.reasonPhrase}: ${resp.body}',
+        );
+      }
+      final decoded = jsonDecode(resp.body);
+      if (decoded is Map<String, dynamic>) {
+        return CreateMessageResult.fromJson(decoded);
+      }
+      throw Exception('Unexpected response: ${resp.body}');
+    } else {
+      // JSON fallback when not uploading a file
+      final bodyMap = <String, dynamic>{
+        'id': userId,
+        'bot': botId,
+        'content': content,
+      };
+      if (historyChat != null && historyChat.isNotEmpty) {
+        bodyMap['historyChat'] = historyChat;
+      }
+      final resp = await _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(bodyMap),
+      );
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        throw Exception(
+          'POST $uri failed: ${resp.statusCode} ${resp.reasonPhrase}: ${resp.body}',
+        );
+      }
+      final decoded = jsonDecode(resp.body);
+      if (decoded is Map<String, dynamic>) {
+        return CreateMessageResult.fromJson(decoded);
+      }
+      throw Exception('Unexpected response: ${resp.body}');
+    }
+  }
+
+  Future<String> uploadChatFile(File file) async {
+    final uri = Uri.parse('$baseUrl/upload-file-chat');
+    final req = http.MultipartRequest('POST', uri);
+    final mimeType = _inferMime(file.path);
+    req.files.add(
+      await http.MultipartFile.fromPath(
+        'file',
+        file.path,
+        contentType: mimeType,
+      ),
+    );
+    final streamed = await req.send();
+    final resp = await http.Response.fromStream(streamed);
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception('Upload failed ${resp.statusCode}: ${resp.body}');
+    }
+    final raw = resp.body.trim();
+    // Case 1: backend already returns a bare URL (no JSON)
+    if ((raw.startsWith('http://') || raw.startsWith('https://')) &&
+        !raw.startsWith('{') &&
+        !raw.startsWith('[')) {
+      return raw;
+    }
+    // Try JSON decode
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } catch (_) {
+      // Fallback: treat as URL if it looks like one
+      if (raw.contains('://')) return raw;
+      throw Exception('Upload response parse error: $raw');
+    }
+    if (decoded is String) {
+      // JSON string value (e.g. "https://...")
+      if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
+        return decoded;
+      }
+      throw Exception('Unexpected upload string: $decoded');
+    }
+    if (decoded is Map) {
+      // Common patterns: {url: ...} or {data: {url: ...}} or nested message
+      if (decoded['url'] != null) return decoded['url'].toString();
+      final data = decoded['data'];
+      if (data is Map && data['url'] != null) return data['url'].toString();
+      // Some APIs return {status:200, data:"https://..."}
+      if (data is String &&
+          (data.startsWith('http://') || data.startsWith('https://'))) {
+        return data;
+      }
+      // Last resort: search for first http substring
+      final match = RegExp(r'https?://[^"\s]+').firstMatch(raw);
+      if (match != null) return match.group(0)!;
+      throw Exception('Upload response missing URL: $raw');
+    }
+    throw Exception('Unhandled upload response shape: $raw');
+  }
+
+  // Update a message with a history id after it is created.
+  Future<void> updateMessageHistory({
+    required String messageId,
+    required String historyId,
+  }) async {
+    if (historyId.isEmpty) return; // nothing to do
+    final uri = Uri.parse('$baseUrl/update-message-history');
+    final resp = await _client.put(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'id': messageId, 'history': historyId}),
+    );
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception(
+        'PUT $uri failed: ${resp.statusCode} ${resp.reasonPhrase}: ${resp.body}',
+      );
+    }
+  }
+
+  // Update message status: 1 = like, 2 = dislike
+  Future<void> updateMessageStatus({
+    required String messageId,
+    required int status,
+  }) async {
+    final uri = Uri.parse('$baseUrl/update-message');
+    final resp = await _client.put(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'id': messageId, 'status': status}),
+    );
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception(
+        'PUT $uri failed: ${resp.statusCode} ${resp.reasonPhrase}: ${resp.body}',
+      );
+    }
+  }
+
+  static MediaType _inferMime(String path) {
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.png')) return MediaType('image', 'png');
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg'))
+      return MediaType('image', 'jpeg');
+    if (lower.endsWith('.webp')) return MediaType('image', 'webp');
+    if (lower.endsWith('.gif')) return MediaType('image', 'gif');
+    if (lower.endsWith('.pdf')) return MediaType('application', 'pdf');
+    if (lower.endsWith('.docx'))
+      return MediaType(
+        'application',
+        'vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
+    if (lower.endsWith('.txt')) return MediaType('text', 'plain');
+    return MediaType('application', 'octet-stream');
   }
 }

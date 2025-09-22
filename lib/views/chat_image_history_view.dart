@@ -37,18 +37,28 @@ class _ChatImageHistoryViewState extends State<ChatImageHistoryView> {
   late Future<BotModel> _botFuture;
   bool _sending = false;
   String? _historyId; // set after load
+  int _page = 1;
+  final int _limit = 50;
+  bool _hasMore = true;
+  bool _loadingMore = false;
+  DateTime _lastLoadMore = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void initState() {
     super.initState();
     _historyId = widget.historyId;
     _botFuture = _initHistoryAndBot();
+    _listCtrl.addListener(_onScroll);
   }
 
   Future<BotModel> _initHistoryAndBot() async {
     try {
       final repo = ChatRepository.fromEnv();
-      final list = await repo.loadChatByHistoryId(widget.historyId, limit: 80);
+      final list = await repo.loadChatByHistoryId(
+        widget.historyId,
+        limit: _limit,
+        page: _page,
+      );
       // Extract botId from messages if any
       String? botId = widget.botId;
       for (final m in list) {
@@ -69,7 +79,8 @@ class _ChatImageHistoryViewState extends State<ChatImageHistoryView> {
       setState(() {
         _messages
           ..clear()
-          ..addAll(list);
+          ..addAll(list); // list desc (newest -> older)
+        if (list.length < _limit) _hasMore = false;
       });
       // Auto scroll bottom after short delay
       await Future.delayed(const Duration(milliseconds: 40));
@@ -84,6 +95,57 @@ class _ChatImageHistoryViewState extends State<ChatImageHistoryView> {
         ).showSnackBar(SnackBar(content: Text('Tải lịch sử thất bại: $e')));
       }
       rethrow;
+    }
+  }
+
+  void _onScroll() {
+    if (!_listCtrl.hasClients) return;
+    if (_listCtrl.position.pixels <= 40 && _hasMore && !_loadingMore) {
+      final now = DateTime.now();
+      if (now.difference(_lastLoadMore).inMilliseconds >= 400) {
+        _lastLoadMore = now;
+        _loadMore();
+      }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    setState(() => _loadingMore = true);
+    try {
+      final repo = ChatRepository.fromEnv();
+      final nextPage = _page + 1;
+      double? oldMax;
+      double? oldPixels;
+      if (_listCtrl.hasClients) {
+        oldMax = _listCtrl.position.maxScrollExtent;
+        oldPixels = _listCtrl.position.pixels;
+      }
+      final list = await repo.loadChatByHistoryId(
+        widget.historyId,
+        limit: _limit,
+        page: nextPage,
+      );
+      if (!mounted) return;
+      setState(() {
+        _page = nextPage;
+        if (list.length < _limit) _hasMore = false;
+        _messages.addAll(list); // append desc chunk
+      });
+      if (oldMax != null && oldPixels != null && _listCtrl.hasClients) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_listCtrl.hasClients) return;
+          final newMax = _listCtrl.position.maxScrollExtent;
+          final delta = newMax - oldMax!;
+          final target = oldPixels! + delta;
+          if (target <= _listCtrl.position.maxScrollExtent) {
+            _listCtrl.jumpTo(target);
+          }
+        });
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -118,6 +180,12 @@ class _ChatImageHistoryViewState extends State<ChatImageHistoryView> {
       );
       _messages.add(placeholder!);
       _inputCtrl.clear();
+    });
+    // Auto scroll after local insertion
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_listCtrl.hasClients) {
+        _listCtrl.jumpTo(_listCtrl.position.maxScrollExtent);
+      }
     });
     try {
       final repo = ChatRepository.fromEnv();
@@ -171,7 +239,9 @@ class _ChatImageHistoryViewState extends State<ChatImageHistoryView> {
     final align = isUser ? MainAxisAlignment.end : MainAxisAlignment.start;
     final children = <Widget>[];
 
-    if (m.text.isNotEmpty) {
+    final isLikelyImageUrl =
+        !isUser && m.fileUrl == null && m.text.trim().startsWith('http');
+    if (m.text.isNotEmpty && !isLikelyImageUrl) {
       children.add(
         Row(
           mainAxisAlignment: align,
@@ -245,6 +315,49 @@ class _ChatImageHistoryViewState extends State<ChatImageHistoryView> {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(20),
                       onTap: () => _downloadImage(m.fileUrl!),
+                      child: const Padding(
+                        padding: EdgeInsets.all(6.0),
+                        child: Icon(
+                          Icons.download_rounded,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+    // Fallback: bot only sent URL in text
+    if (isLikelyImageUrl) {
+      final url = m.text.trim();
+      children.add(
+        Row(
+          mainAxisAlignment: align,
+          children: [
+            Stack(
+              children: [
+                GestureDetector(
+                  onTap: () => _openImage(url),
+                  child: _ProgressiveImage(
+                    url: _absUrl(url),
+                    width: 220,
+                    borderRadius: 10,
+                  ),
+                ),
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Material(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(20),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => _downloadImage(url),
                       child: const Padding(
                         padding: EdgeInsets.all(6.0),
                         child: Icon(
@@ -473,12 +586,26 @@ class _ChatImageHistoryViewState extends State<ChatImageHistoryView> {
                     ),
                   );
                 }
+                final display = _messages.reversed.toList(); // ASC (old -> new)
                 return ListView.builder(
                   controller: _listCtrl,
                   padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
-                  itemCount: _messages.length,
+                  itemCount: display.length + (_loadingMore ? 1 : 0),
                   itemBuilder: (_, i) {
-                    final m = _messages[i];
+                    if (_loadingMore && i == 0) {
+                      return const Padding(
+                        padding: EdgeInsets.only(bottom: 12),
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      );
+                    }
+                    final idx = _loadingMore ? i - 1 : i;
+                    final m = display[idx];
                     final isUser = m.role == 'user';
                     return _bubble(m, isUser: isUser);
                   },

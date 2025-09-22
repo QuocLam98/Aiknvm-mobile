@@ -338,35 +338,12 @@ class AppDrawer extends StatelessWidget {
                               );
                             }
 
-                            return AnimatedBuilder(
-                              animation: history,
-                              builder: (_, __) {
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: list.map((item) {
-                                    final isActive =
-                                        current.kind == DrawerKind.history &&
-                                        current.id == item.id;
-
-                                    return _MenuItem(
-                                      label: item.name ?? '',
-                                      active: isActive,
-                                      onTap: () {
-                                        if (item.id == null) return; // <- guard
-                                        history.selectHistory(item);
-                                        _popThen(() {
-                                          onSelect?.call(
-                                            DrawerKey(
-                                              DrawerKind.history,
-                                              id: item.id!,
-                                            ), // <- truyền id
-                                          );
-                                        });
-                                      },
-                                    );
-                                  }).toList(),
-                                );
-                              },
+                            return _HistoryListWithDelete(
+                              history: history,
+                              current: current,
+                              items: list,
+                              onSelect: onSelect,
+                              popThen: _popThen,
                             );
                           },
                         ),
@@ -437,6 +414,118 @@ class _MenuItem extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _HistoryListWithDelete extends StatefulWidget {
+  final HistoryController history;
+  final DrawerKey current;
+  final List<HistoryMessage> items;
+  final void Function(DrawerKey key)? onSelect;
+  final void Function(void Function()) popThen;
+  const _HistoryListWithDelete({
+    required this.history,
+    required this.current,
+    required this.items,
+    required this.onSelect,
+    required this.popThen,
+  });
+
+  @override
+  State<_HistoryListWithDelete> createState() => _HistoryListWithDeleteState();
+}
+
+class _HistoryListWithDeleteState extends State<_HistoryListWithDelete> {
+  final Set<String> _deleting = {};
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widget.items.map((item) {
+        final isActive =
+            widget.current.kind == DrawerKind.history &&
+            widget.current.id == item.id;
+        final id = item.id;
+        final deleting = id != null && _deleting.contains(id);
+        return Opacity(
+          opacity: deleting ? 0.6 : 1.0,
+          child: Row(
+            children: [
+              Expanded(
+                child: _MenuItem(
+                  label: item.name ?? '',
+                  active: isActive,
+                  onTap: () {
+                    if (id == null || deleting) return;
+                    widget.history.selectHistory(item);
+                    widget.popThen(() {
+                      widget.onSelect?.call(
+                        DrawerKey(DrawerKind.history, id: id),
+                      );
+                    });
+                  },
+                ),
+              ),
+              if (id != null)
+                IconButton(
+                  tooltip: deleting ? 'Đang xóa...' : 'Xóa',
+                  icon: deleting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.delete_outline, size: 18),
+                  onPressed: deleting
+                      ? null
+                      : () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: const Text('Xóa lịch sử?'),
+                              content: const Text(
+                                'Bạn chắc chắn muốn xóa đoạn chat này?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(false),
+                                  child: const Text('Hủy'),
+                                ),
+                                FilledButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(true),
+                                  child: const Text('Xóa'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm != true) return;
+                          setState(() => _deleting.add(id));
+                          try {
+                            await widget.history.deleteHistory(id);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Đã xóa lịch sử')),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Xóa thất bại: $e')),
+                              );
+                            }
+                          } finally {
+                            if (mounted) setState(() => _deleting.remove(id));
+                          }
+                        },
+                ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 }

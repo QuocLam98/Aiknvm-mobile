@@ -63,4 +63,13 @@ class HistoryController extends ChangeNotifier {
       return null;
     }
   }
+
+  Future<void> deleteHistory(String id) async {
+    try {
+      await _repo.deleteHistoryChat(id);
+      await refreshHistory();
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

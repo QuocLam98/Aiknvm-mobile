@@ -1,13 +1,10 @@
 // lib/services/history_message_repository.dart
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../models/history_message.dart';
-import '../models/chat_message_model.dart';
 
 class HistoryMessageRepository {
   final String baseUrl;
@@ -79,5 +76,17 @@ class HistoryMessageRepository {
     }
 
     throw Exception('Unexpected format from API: $decoded');
+  }
+
+  Future<void> deleteHistoryChat(String id) async {
+    final uri = Uri.parse('$baseUrl/delete-chat');
+    final resp = await _client.put(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'id': id}),
+    );
+    if (resp.statusCode != 200) {
+      throw Exception('PUT $uri -> ${resp.statusCode} ${resp.reasonPhrase}');
+    }
   }
 }

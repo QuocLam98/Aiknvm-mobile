@@ -125,8 +125,8 @@ class _HistoryChatViewState extends State<HistoryChatView> {
 
   void _onScroll() {
     if (!_scroll.hasClients) return;
-    final threshold = _scroll.position.maxScrollExtent - 200;
-    if (_scroll.position.pixels >= threshold &&
+    // Load more older messages when user scrolls near top
+    if (_scroll.position.pixels <= 40 &&
         widget.ctrl.hasNext &&
         !widget.ctrl.busy) {
       widget.ctrl.loadMore();

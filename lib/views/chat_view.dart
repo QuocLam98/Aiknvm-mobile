@@ -14,6 +14,7 @@ import '../models/bot_model.dart';
 import '../models/chat_message_model.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/drawer_key.dart';
+import '../services/chat_repository.dart';
 
 class ChatView extends StatefulWidget {
   final AuthController auth;
@@ -36,6 +37,9 @@ class ChatView extends StatefulWidget {
 class _ChatViewState extends State<ChatView> {
   final _inputCtrl = TextEditingController();
   late Future<BotModel> _botFuture;
+  final ScrollController _listCtrl = ScrollController();
+  final List<ChatMessageModel> _messages = [];
+  bool _sending = false;
 
   String _shortName(String name) {
     final t = name.trim();
@@ -106,6 +110,7 @@ class _ChatViewState extends State<ChatView> {
   @override
   void dispose() {
     _inputCtrl.dispose();
+    _listCtrl.dispose();
     super.dispose();
   }
 
@@ -217,76 +222,78 @@ class _ChatViewState extends State<ChatView> {
           final bot = snapshot.data!;
           return LayoutBuilder(
             builder: (context, constraints) {
-              return SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: IntrinsicHeight(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 24,
-                      ),
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 40),
-                          Center(
-                            child: Container(
-                              width: 128,
-                              height: 128,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.08),
-                                    blurRadius: 18,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
+              // Show initial info when no messages else show list
+              if (_messages.isEmpty) {
+                return SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 40,
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 128,
+                          height: 128,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 18,
+                                spreadRadius: 2,
                               ),
-                              clipBehavior: Clip.antiAlias,
-                              child:
-                                  (bot.image != null && bot.image!.isNotEmpty)
-                                  ? Image.network(
-                                      bot.image!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) =>
-                                          const Icon(Icons.smart_toy, size: 64),
-                                    )
-                                  : const ColoredBox(
-                                      color: Color(0xFFEFF3F8),
-                                      child: Icon(Icons.smart_toy, size: 64),
-                                    ),
-                            ),
+                            ],
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            bot.name.toUpperCase(),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: .3,
-                            ),
+                          clipBehavior: Clip.antiAlias,
+                          child: (bot.image != null && bot.image!.isNotEmpty)
+                              ? Image.network(
+                                  bot.image!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      const Icon(Icons.smart_toy, size: 64),
+                                )
+                              : const ColoredBox(
+                                  color: Color(0xFFEFF3F8),
+                                  child: Icon(Icons.smart_toy, size: 64),
+                                ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          bot.name.toUpperCase(),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: .3,
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            (bot.description.isNotEmpty == true)
-                                ? bot.description
-                                : '',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).textTheme.bodyMedium?.color?.withOpacity(.75),
-                            ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          (bot.description.isNotEmpty == true)
+                              ? bot.description
+                              : '',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).textTheme.bodyMedium?.color?.withOpacity(.75),
                           ),
-                          const Spacer(),
-                          const SizedBox(height: 8),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
+                );
+              }
+              return ListView.builder(
+                controller: _listCtrl,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                itemCount: _messages.length,
+                itemBuilder: (_, i) {
+                  final m = _messages[i];
+                  final isUser = m.role == 'user';
+                  return _bubble(m, isUser: isUser);
+                },
               );
             },
           );
@@ -368,9 +375,68 @@ class _ChatViewState extends State<ChatView> {
                   ),
                   const SizedBox(width: 4),
                   FilledButton(
-                    onPressed: () {
+                    onPressed: () async {
                       FocusScope.of(context).unfocus();
-                      // TODO: gửi tin nhắn
+                      final text = _inputCtrl.text.trim();
+                      if (text.isEmpty) return;
+                      final userId = widget.auth.user?.id;
+                      final botId = widget.home.bot?.id;
+                      if (userId == null ||
+                          botId == null ||
+                          userId.isEmpty ||
+                          botId.isEmpty)
+                        return;
+                      setState(() {
+                        _sending = true;
+                        _messages.add(
+                          ChatMessageModel(
+                            id: 'local_${DateTime.now().millisecondsSinceEpoch}_u',
+                            text: text,
+                            role: 'user',
+                            createdAt: DateTime.now(),
+                            botId: botId,
+                          ),
+                        );
+                      });
+                      _inputCtrl.clear();
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (_listCtrl.hasClients) {
+                          _listCtrl.jumpTo(_listCtrl.position.maxScrollExtent);
+                        }
+                      });
+                      try {
+                        final repo = ChatRepository.fromEnv();
+                        final res = await repo.createMessageMobile(
+                          userId: userId,
+                          botId: botId,
+                          content: text,
+                          historyChat: null,
+                        );
+                        if (!mounted) return;
+                        setState(() {
+                          _messages.add(
+                            ChatMessageModel(
+                              id: '${res.id}_b',
+                              text: res.contentBot,
+                              role: 'bot',
+                              createdAt: res.createdAt,
+                              botId: botId,
+                            ),
+                          );
+                        });
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (_listCtrl.hasClients) {
+                            _listCtrl.jumpTo(
+                              _listCtrl.position.maxScrollExtent,
+                            );
+                          }
+                        });
+                      } catch (_) {
+                        if (!mounted) return;
+                        setState(() => _sending = false);
+                      } finally {
+                        if (mounted) setState(() => _sending = false);
+                      }
                     },
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
@@ -379,7 +445,13 @@ class _ChatViewState extends State<ChatView> {
                       ),
                       shape: const StadiumBorder(),
                     ),
-                    child: const Icon(Icons.send_rounded, size: 18),
+                    child: _sending
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send_rounded, size: 18),
                   ),
                 ],
               ),

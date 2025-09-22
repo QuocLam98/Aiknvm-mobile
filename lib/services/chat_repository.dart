@@ -26,34 +26,18 @@ class ChatRepository {
     int page = 1,
     int limit = 20,
   }) async {
-    Future<http.Response> _attemptGet(String paramName) {
-      final uri = Uri.parse(
-        '$baseUrl/list-message-mobile?page=$page&limit=$limit&$paramName=$historyId',
-      );
-      return _client.get(uri, headers: {'Content-Type': 'application/json'});
-    }
-
-    http.Response? resp;
-    String step = 'get_id';
-    resp = await _attemptGet('id');
-    if (resp.statusCode == 422) {
-      // Try alternate param name 'history'
-      step = 'get_history';
-      resp = await _attemptGet('history');
-    }
-    if (resp.statusCode == 422) {
-      // Some backends may require POST with body
-      step = 'post_body';
-      final uri = Uri.parse('$baseUrl/list-message-mobile');
-      resp = await _client.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'id': historyId, 'page': page, 'limit': limit}),
-      );
-    }
+    final safeLimit = limit.clamp(1, 50);
+    final safePage = page < 1 ? 1 : page;
+    final uri = Uri.parse(
+      '$baseUrl/list-message-mobile?page=$safePage&limit=$safeLimit&id=$historyId',
+    );
+    final resp = await _client.get(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+    );
     if (resp.statusCode != 200) {
       throw Exception(
-        'list-message-mobile ($step) failed: ${resp.statusCode} ${resp.reasonPhrase} - ${resp.body}',
+        'GET $uri -> ${resp.statusCode} ${resp.reasonPhrase}: ${resp.body}',
       );
     }
 
@@ -61,29 +45,52 @@ class ChatRepository {
     try {
       root = jsonDecode(resp.body);
     } catch (e) {
-      throw Exception('Parse error ($step): ${resp.body}');
+      throw Exception('Parse error body: ${resp.body}');
     }
 
-    List<dynamic> dataList;
+    // Accept flexible status indicator
     if (root is Map<String, dynamic>) {
-      // Accept different envelope shapes
-      if (root['status'] != null && root['status'] != 200) {
-        throw Exception('API error ($step): ${root['message']}');
+      final status = root['status'];
+      if (status is int && status >= 400) {
+        throw Exception('API error status=$status message=${root['message']}');
       }
-      if (root['data'] is List) {
-        dataList = root['data'] as List;
-      } else if (root['items'] is List) {
-        dataList = root['items'] as List;
-      } else if (root['messages'] is List) {
-        dataList = root['messages'] as List;
+      if (status is String) {
+        final lower = status.toLowerCase();
+        if (lower.contains('error') || lower.contains('fail')) {
+          throw Exception(
+            'API error status=$status message=${root['message']}',
+          );
+        }
+      }
+    }
+
+    // Unwrap nested data maps until we reach a list or give up
+    List<dynamic>? dataList;
+    dynamic cursor = root;
+    int depth = 0;
+    while (depth < 4 && dataList == null && cursor is Map) {
+      final m = cursor;
+      // candidate keys in preference order
+      for (final k in ['data', 'items', 'messages', 'list', 'records']) {
+        final v = m[k];
+        if (v is List) {
+          dataList = v;
+          break;
+        }
+        if (v is Map) {
+          cursor = v;
+          depth++;
+          continue;
+        }
+      }
+      if (dataList == null) break; // none found
+    }
+    if (dataList == null) {
+      if (root is List) {
+        dataList = root;
       } else {
-        // Maybe backend returned a single object; wrap it
-        dataList = [];
+        dataList = const []; // empty gracefully
       }
-    } else if (root is List) {
-      dataList = root;
-    } else {
-      dataList = [];
     }
 
     final messages = <ChatMessageModel>[];

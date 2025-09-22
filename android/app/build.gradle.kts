@@ -6,6 +6,16 @@ plugins {
     // Apply Google Services plugin to read google-services.json
 }
 
+// Load keystore properties (key.properties should NOT be committed)
+import java.util.Properties
+import java.io.FileInputStream
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
+}
+
 android {
     namespace = "vn.aiknvm.mobile"
     compileSdk = flutter.compileSdkVersion
@@ -31,11 +41,35 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                val storeFilePath = keystoreProperties["storeFile"] as String?
+                if (!storeFilePath.isNullOrBlank()) {
+                    storeFile = file(storeFilePath)
+                }
+                storePassword = (keystoreProperties["storePassword"] as String?) ?: ""
+                keyAlias = (keystoreProperties["keyAlias"] as String?) ?: ""
+                keyPassword = (keystoreProperties["keyPassword"] as String?) ?: ""
+            } else {
+                // Fallback to debug signing if release keystore not provided yet
+                signingConfigs.getByName("debug")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Use release signing if available, else debug (for early development)
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+            // Enable shrinking/obfuscation later if needed:
+            // isMinifyEnabled = true
+            // isShrinkResources = true
+            // proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }

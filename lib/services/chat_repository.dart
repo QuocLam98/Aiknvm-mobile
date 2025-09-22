@@ -195,7 +195,7 @@ class ChatRepository {
   }
 
   /// Create a premium image chat message. Supports optional image file upload (edit mode).
-  /// Endpoint: POST /create-message-image-pre
+  /// Endpoint: POST /create-message-image-pre-mobile
   /// If [file] provided uses multipart/form-data, else JSON body.
   Future<CreateMessageResult> createMessageImagePremium({
     required String userId,
@@ -204,7 +204,7 @@ class ChatRepository {
     String? historyChat,
     File? file,
   }) async {
-    final uri = Uri.parse('$baseUrl/create-message-image-pre');
+    final uri = Uri.parse('$baseUrl/create-message-image-pre-mobile');
     if (file != null) {
       final req = http.MultipartRequest('POST', uri);
       req.fields['id'] = userId;

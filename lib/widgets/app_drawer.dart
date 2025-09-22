@@ -188,7 +188,7 @@ class AppDrawer extends StatelessWidget {
                           animation: AppEvents.instance,
                           builder: (context, _) {
                             return FutureBuilder<List<BotModel>>(
-                              future: home.reloadBots(),
+                              future: home.getAllBots(),
                               builder: (context, snapshot) {
                                 if (snapshot.connectionState ==
                                     ConnectionState.waiting) {
@@ -251,6 +251,44 @@ class AppDrawer extends StatelessWidget {
                                                   width: 22,
                                                   height: 22,
                                                   fit: BoxFit.cover,
+                                                  gaplessPlayback: true,
+                                                  frameBuilder:
+                                                      (
+                                                        context,
+                                                        child,
+                                                        frame,
+                                                        wasSync,
+                                                      ) {
+                                                        if (frame == null) {
+                                                          return Container(
+                                                            width: 22,
+                                                            height: 22,
+                                                            color: Colors
+                                                                .grey
+                                                                .shade200,
+                                                            child: const Center(
+                                                              child: SizedBox(
+                                                                width: 10,
+                                                                height: 10,
+                                                                child:
+                                                                    CircularProgressIndicator(
+                                                                      strokeWidth:
+                                                                          1.2,
+                                                                    ),
+                                                              ),
+                                                            ),
+                                                          );
+                                                        }
+                                                        return AnimatedOpacity(
+                                                          opacity: 1.0,
+                                                          duration:
+                                                              const Duration(
+                                                                milliseconds:
+                                                                    180,
+                                                              ),
+                                                          child: child,
+                                                        );
+                                                      },
                                                   errorBuilder: (_, __, ___) =>
                                                       const Icon(
                                                         Icons

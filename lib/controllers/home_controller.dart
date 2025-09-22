@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import '../models/bot_model.dart';
 import '../services/bot_repository.dart';
 
@@ -56,13 +57,19 @@ class HomeController extends ChangeNotifier {
 
   /// Lấy tất cả bot (có cache Future)
   Future<List<BotModel>> getAllBots() {
-    _botsFuture ??= _repo.getAllBots();
+    _botsFuture ??= _repo.getAllBots().then((list) {
+      _warmBotImages(list);
+      return list;
+    });
     return _botsFuture!;
   }
 
   /// Buộc làm mới danh sách bot (nếu bạn muốn có nút Reload trong UI)
   Future<List<BotModel>> reloadBots() {
-    _botsFuture = _repo.getAllBots();
+    _botsFuture = _repo.getAllBots().then((list) {
+      _warmBotImages(list);
+      return list;
+    });
     return _botsFuture!;
   }
 
@@ -91,6 +98,16 @@ class HomeController extends ChangeNotifier {
     } finally {
       _busy = false;
       notifyListeners();
+    }
+  }
+
+  void _warmBotImages(List<BotModel> bots) {
+    // Prefetch network images so they appear instantly in UI list.
+    for (final b in bots) {
+      final url = b.image;
+      if (url == null || url.isEmpty) continue;
+      final provider = NetworkImage(url);
+      provider.resolve(const ImageConfiguration());
     }
   }
 }

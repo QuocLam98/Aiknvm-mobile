@@ -209,7 +209,19 @@ class _AdminTableScaffoldState extends State<AdminTableScaffold> {
       alignment: Alignment.centerLeft,
       child: Wrap(
         spacing: 6,
-        children: [...buttons, const SizedBox(width: 12), _pageSizeDropdown()],
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(
+            'Trang '
+            '$_page'
+            '/$totalPages',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 8),
+          ...buttons,
+          const SizedBox(width: 12),
+          _pageSizeDropdown(),
+        ],
       ),
     );
   }
@@ -220,10 +232,16 @@ class _AdminTableScaffoldState extends State<AdminTableScaffold> {
     required VoidCallback onTap,
   }) => ElevatedButton(onPressed: enabled ? onTap : null, child: Text(label));
 
-  Widget _pagerNumber(int p) => OutlinedButton(
-    onPressed: () => setState(() => _page = p),
-    child: Text(p.toString()),
-  );
+  Widget _pagerNumber(int p) {
+    final isActive = p == _page;
+    if (isActive) {
+      return FilledButton(onPressed: () {}, child: Text(p.toString()));
+    }
+    return OutlinedButton(
+      onPressed: () => setState(() => _page = p),
+      child: Text(p.toString()),
+    );
+  }
 
   Widget _ellipsis() => const Padding(
     padding: EdgeInsets.symmetric(horizontal: 4, vertical: 10),

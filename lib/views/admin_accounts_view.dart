@@ -250,16 +250,19 @@ class _AdminAccountsViewState extends State<AdminAccountsView> {
           ),
         );
       }
+      final isActive = p == _page;
       buttons.add(
-        OutlinedButton(
-          onPressed: () {
-            setState(() {
-              _page = p;
-            });
-            _load();
-          },
-          child: Text(p.toString()),
-        ),
+        isActive
+            ? FilledButton(onPressed: () {}, child: Text(p.toString()))
+            : OutlinedButton(
+                onPressed: () {
+                  setState(() {
+                    _page = p;
+                  });
+                  _load();
+                },
+                child: Text(p.toString()),
+              ),
       );
       last = p;
     }
@@ -281,7 +284,20 @@ class _AdminAccountsViewState extends State<AdminAccountsView> {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       alignment: Alignment.centerLeft,
-      child: Wrap(spacing: 6, children: buttons),
+      child: Wrap(
+        spacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(
+            'Trang '
+            '$_page'
+            '/$totalPages',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 8),
+          ...buttons,
+        ],
+      ),
     );
   }
 }

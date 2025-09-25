@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -21,6 +22,12 @@ class _AdminBotsViewState extends State<AdminBotsView> {
   List<BotModel> _items = const [];
   bool _loading = true;
   String? _error;
+  // Remote-style state (client-side paginate)
+  int _page = 1;
+  int _limit = 10;
+  int _total = 0; // computed from filtered
+  String _keyword = '';
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -45,7 +52,16 @@ class _AdminBotsViewState extends State<AdminBotsView> {
 
   String _statusText(int s) => s == 1 ? 'Bảo trì' : 'Hoạt động';
 
-  List<List<String>> get _tableData => _items
+  List<BotModel> _filtered() {
+    final q = _keyword.trim().toLowerCase();
+    if (q.isEmpty) return _items;
+    return _items.where((b) {
+      return b.name.toLowerCase().contains(q) ||
+          (b.description.toLowerCase().contains(q));
+    }).toList();
+  }
+
+  List<List<String>> _tableDataFor(List<BotModel> list) => list
       .map(
         (b) => [
           b.name,
@@ -184,6 +200,17 @@ class _AdminBotsViewState extends State<AdminBotsView> {
 
   @override
   Widget build(BuildContext context) {
+    // Prepare filtered + paged data like Accounts/Messages/Payments
+    final filtered = _filtered();
+    _total = filtered.length;
+    final totalPages = (_total / _limit).ceil().clamp(1, 9999);
+    _page = _page.clamp(1, totalPages);
+    final start = (_page - 1) * _limit;
+    final end = (start + _limit).clamp(0, _total);
+    final pageItems = (start < _total)
+        ? filtered.sublist(start, end)
+        : <BotModel>[];
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('[Admin] Quản lý bot'),
@@ -198,6 +225,61 @@ class _AdminBotsViewState extends State<AdminBotsView> {
       ),
       body: Column(
         children: [
+          // Thanh tìm kiếm + page size (giống các trang khác)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Tìm theo tên hoặc mô tả...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      suffixIcon: const Icon(Icons.search),
+                    ),
+                    onChanged: (v) {
+                      _debounce?.cancel();
+                      _debounce = Timer(const Duration(milliseconds: 400), () {
+                        _keyword = v.trim();
+                        setState(() => _page = 1);
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                DropdownButton<int>(
+                  value: _limit,
+                  items: const [10, 20, 50]
+                      .map(
+                        (v) => DropdownMenuItem<int>(
+                          value: v,
+                          child: Text(v.toString()),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() {
+                      _limit = v;
+                      _page = 1;
+                    });
+                  },
+                ),
+                const SizedBox(width: 12),
+                IconButton(
+                  tooltip: 'Làm mới',
+                  onPressed: _loading ? null : _load,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+          ),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.all(8.0),
@@ -207,9 +289,9 @@ class _AdminBotsViewState extends State<AdminBotsView> {
           Expanded(
             child: AdminTableScaffold(
               columns: _columns,
-              data: _tableData,
-              showSearch: true,
-              showPagination: true,
+              data: _tableDataFor(pageItems),
+              showSearch: false,
+              showPagination: false, // dùng phân trang remote phía dưới
               cellMaxWidth: 260,
               actionsBuilder: (row) => Row(
                 mainAxisSize: MainAxisSize.min,
@@ -217,18 +299,96 @@ class _AdminBotsViewState extends State<AdminBotsView> {
                   IconButton(
                     tooltip: 'Sửa',
                     icon: const Icon(Icons.edit_outlined),
-                    onPressed: () => _onEdit(row),
+                    onPressed: () => _onEdit((start + row)),
                   ),
                   const SizedBox(width: 4),
                   IconButton(
                     tooltip: 'Xoá',
                     icon: const Icon(Icons.delete_outline),
-                    onPressed: () => _onDelete(row),
+                    onPressed: () => _onDelete((start + row)),
                   ),
                 ],
               ),
             ),
           ),
+          _remotePagination(_total),
+        ],
+      ),
+    );
+  }
+
+  Widget _remotePagination(int total) {
+    final totalPages = (total / _limit).ceil().clamp(1, 9999);
+    _page = _page.clamp(1, totalPages);
+    List<Widget> buttons = [];
+
+    buttons.add(
+      ElevatedButton(
+        onPressed: _page > 1 ? () => setState(() => _page--) : null,
+        child: const Text('Prev'),
+      ),
+    );
+
+    const maxPagesToShow = 7;
+    List<int> pages;
+    if (totalPages <= maxPagesToShow) {
+      pages = List.generate(totalPages, (i) => i + 1);
+    } else {
+      pages = <int>{
+        1,
+        totalPages,
+        _page,
+        _page - 1,
+        _page + 1,
+        2,
+        totalPages - 1,
+      }.where((p) => p >= 1 && p <= totalPages).toList()..sort();
+    }
+
+    int? last;
+    for (final p in pages) {
+      if (last != null && p - last > 1) {
+        buttons.add(
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Text('...'),
+          ),
+        );
+      }
+      final isActive = p == _page;
+      buttons.add(
+        isActive
+            ? FilledButton(onPressed: () {}, child: Text(p.toString()))
+            : OutlinedButton(
+                onPressed: () => setState(() => _page = p),
+                child: Text(p.toString()),
+              ),
+      );
+      last = p;
+    }
+
+    buttons.add(
+      ElevatedButton(
+        onPressed: _page < totalPages ? () => setState(() => _page++) : null,
+        child: const Text('Next'),
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+        spacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(
+            'Trang '
+            '$_page'
+            '/$totalPages',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 8),
+          ...buttons,
         ],
       ),
     );

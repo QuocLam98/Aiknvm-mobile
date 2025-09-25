@@ -22,8 +22,10 @@ Future<void> main() async {
       'API_BASE_URL',
       defaultValue: '',
     ),
-    'GOOGLE_CLIENT_ID': const String.fromEnvironment(
-      'GOOGLE_CLIENT_ID',
+    // Allow using GOOGLE_WEB_CLIENT_ID from --dart-define-from-file
+    // without bundling .env. AuthRepository will fallback to this key.
+    'GOOGLE_WEB_CLIENT_ID': const String.fromEnvironment(
+      'GOOGLE_WEB_CLIENT_ID',
       defaultValue: '',
     ),
     'DEFAULT_BOT': const String.fromEnvironment(

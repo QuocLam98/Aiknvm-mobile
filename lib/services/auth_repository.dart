@@ -50,19 +50,20 @@ class AuthRepository {
   static Future<void> init() async {
     _prefs ??= await SharedPreferences.getInstance();
     // Khởi tạo Google Sign-In (v7: cần initialize trước khi dùng)
-    // Lấy Web Client ID từ biến môi trường; KHÔNG dùng fallback để tránh sai Project
-    final envClientId = dotenv.env['GOOGLE_CLIENT_ID']?.trim();
-    final clientIdOrNull = (envClientId != null && envClientId.isNotEmpty)
-        ? envClientId
-        : null;
+    // Ưu tiên GOOGLE_CLIENT_ID; nếu thiếu, fallback sang GOOGLE_WEB_CLIENT_ID (key bạn đang có trong .env)
+    String? clientIdOrNull = dotenv.env['GOOGLE_CLIENT_ID']?.trim();
+    clientIdOrNull = (clientIdOrNull != null && clientIdOrNull.isNotEmpty)
+        ? clientIdOrNull
+        : (dotenv.env['GOOGLE_WEB_CLIENT_ID']?.trim().isNotEmpty == true
+              ? dotenv.env['GOOGLE_WEB_CLIENT_ID']!.trim()
+              : null);
 
     // Log ngắn gọn để kiểm tra cấu hình (ẩn bớt ID)
     final preview = (clientIdOrNull == null || clientIdOrNull.length < 10)
         ? 'null'
         : '${clientIdOrNull.substring(0, 8)}…${clientIdOrNull.substring(clientIdOrNull.length - 10)}';
-    debugPrint(
-      'GoogleSignIn init - kIsWeb=$kIsWeb, serverClientId(Android)=$preview',
-    );
+    debugPrint('GoogleSignIn init - kIsWeb=$kIsWeb');
+    debugPrint('  serverClientId(Android)/clientId(Web) preview: $preview');
 
     await GoogleSignIn.instance.initialize(
       clientId: kIsWeb ? clientIdOrNull : null,
@@ -106,7 +107,6 @@ class AuthRepository {
     try {
       acc = await _google
           .authenticate(); // hoặc authenticate() tuỳ phiên bản plugin
-      if (acc == null) throw Exception('Người dùng đã huỷ đăng nhập Google');
     } catch (e) {
       throw Exception('Google Sign-In thất bại: $e');
     }

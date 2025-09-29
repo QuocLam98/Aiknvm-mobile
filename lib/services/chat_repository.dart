@@ -113,7 +113,7 @@ class ChatRepository {
     String? fileType,
     String? historyChat,
   }) async {
-    final uri = Uri.parse('$baseUrl/create-message-mobile');
+    final uri = Uri.parse('$baseUrl/create-message-mobile-gemini');
     // Build body map explicitly so we can log and verify values before sending.
     final bodyMap = <String, dynamic>{
       'id': userId,

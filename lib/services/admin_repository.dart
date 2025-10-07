@@ -171,6 +171,37 @@ class AdminRepository {
     }
     throw Exception('Unexpected response shape for update-user: ${resp.body}');
   }
+
+  Future<void> updateUserActive({
+    required String id,
+    required bool active,
+  }) async {
+    final uri = Uri.parse('$baseUrl/delete-user/$id');
+    final resp = await _client.put(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'active': active}),
+    );
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception(
+        'PUT $uri -> ${resp.statusCode} ${resp.reasonPhrase}: ${resp.body}',
+      );
+    }
+    // API returns { status, message, id, active } - nothing else needed here
+  }
+
+  Future<void> hardDeleteUser(String id) async {
+    final uri = Uri.parse('$baseUrl/hard-delete-user/$id');
+    final resp = await _client.delete(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+    );
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception(
+        'DELETE $uri -> ${resp.statusCode} ${resp.reasonPhrase}: ${resp.body}',
+      );
+    }
+  }
 }
 
 int? _asInt(dynamic v) {

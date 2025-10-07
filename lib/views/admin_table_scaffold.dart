@@ -10,6 +10,10 @@ class AdminTableScaffold extends StatefulWidget {
   final bool showSearch;
   final bool showPagination;
   final double? cellMaxWidth; // constrain cell width to enable ellipsis
+  // Optional per-cell widget renderer. Return null to fallback to text.
+  final Widget? Function(int rowIndex, int colIndex, String value)? cellBuilder;
+  // Center specific columns by index (0-based for provided columns list).
+  final Set<int> centerColumns;
 
   const AdminTableScaffold({
     super.key,
@@ -20,6 +24,8 @@ class AdminTableScaffold extends StatefulWidget {
     this.showSearch = true,
     this.showPagination = true,
     this.cellMaxWidth = 240,
+    this.cellBuilder,
+    this.centerColumns = const {},
   });
 
   @override
@@ -101,12 +107,7 @@ class _AdminTableScaffoldState extends State<AdminTableScaffold> {
                   headingRowHeight: 46,
                   dataRowMinHeight: 44,
                   dataRowMaxHeight: 56,
-                  columns: [
-                    const DataColumn(label: Text('#')),
-                    ...widget.columns.map((c) => DataColumn(label: Text(c))),
-                    if (hasActions)
-                      const DataColumn(label: SizedBox(width: 80)),
-                  ],
+                  columns: _buildColumns(hasActions: hasActions),
                   rows: [
                     for (int i = 0; i < pageIndexes.length; i++)
                       _buildRow(
@@ -125,6 +126,30 @@ class _AdminTableScaffoldState extends State<AdminTableScaffold> {
     );
   }
 
+  List<DataColumn> _buildColumns({required bool hasActions}) {
+    final cols = <DataColumn>[];
+    // Index column
+    cols.add(const DataColumn(label: Text('#')));
+    // Data columns
+    for (int i = 0; i < widget.columns.length; i++) {
+      final text = Text(widget.columns[i]);
+      final aligned = Align(
+        alignment: widget.centerColumns.contains(i)
+            ? Alignment.center
+            : Alignment.centerLeft,
+        child: text,
+      );
+      final label = widget.cellMaxWidth != null
+          ? SizedBox(width: widget.cellMaxWidth, child: aligned)
+          : aligned;
+      cols.add(DataColumn(label: label));
+    }
+    if (hasActions) {
+      cols.add(const DataColumn(label: SizedBox(width: 80)));
+    }
+    return cols;
+  }
+
   DataRow _buildRow({
     required int index,
     required int rowIndex,
@@ -133,17 +158,27 @@ class _AdminTableScaffoldState extends State<AdminTableScaffold> {
     final row = widget.data[rowIndex];
     final cells = <DataCell>[];
     cells.add(DataCell(Text(index.toString())));
-    for (final c in row) {
-      final child = Text(
-        c,
-        overflow: TextOverflow.ellipsis,
-        maxLines: 1,
-        softWrap: false,
-      );
+    final int columnCount = widget.columns.length;
+    for (int col = 0; col < columnCount; col++) {
+      final c = col < row.length ? row[col] : '';
+      final custom = widget.cellBuilder?.call(rowIndex, col, c);
+      final baseChild =
+          custom ??
+          Text(
+            c,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+            softWrap: false,
+          );
+      final alignedChild = widget.centerColumns.contains(col)
+          ? Align(alignment: Alignment.center, child: baseChild)
+          : baseChild;
       if (widget.cellMaxWidth != null) {
-        cells.add(DataCell(SizedBox(width: widget.cellMaxWidth, child: child)));
+        cells.add(
+          DataCell(SizedBox(width: widget.cellMaxWidth, child: alignedChild)),
+        );
       } else {
-        cells.add(DataCell(child));
+        cells.add(DataCell(alignedChild));
       }
     }
     if (hasActions) {
@@ -156,6 +191,17 @@ class _AdminTableScaffoldState extends State<AdminTableScaffold> {
           ),
         ),
       );
+    }
+    // Final safety: match header cells count exactly
+    final expectedCells = 1 + widget.columns.length + (hasActions ? 1 : 0);
+    if (cells.length < expectedCells) {
+      // pad with empty cells
+      for (int i = cells.length; i < expectedCells; i++) {
+        cells.add(const DataCell(SizedBox.shrink()));
+      }
+    } else if (cells.length > expectedCells) {
+      // truncate extras
+      cells.removeRange(expectedCells, cells.length);
     }
     return DataRow(cells: cells);
   }

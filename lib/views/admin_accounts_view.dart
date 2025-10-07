@@ -18,6 +18,7 @@ class _AdminAccountsViewState extends State<AdminAccountsView> {
     'Email',
     'Số điện thoại',
     'Loại tài khoản',
+    'Trạng thái',
     'Ngày tạo',
   ];
 
@@ -113,8 +114,76 @@ class _AdminAccountsViewState extends State<AdminAccountsView> {
   }
 
   List<List<String>> get _tableData => _items
-      .map((u) => [u.name, u.email, u.phone, u.role, u.createdAt])
+      .map(
+        (u) => [
+          u.name,
+          u.email,
+          u.phone,
+          u.role,
+          (u.active ?? false) ? '1' : '0',
+          u.createdAt,
+        ],
+      )
       .toList();
+
+  void _toggleActive(int rowIndex, bool v) {
+    if (rowIndex < 0 || rowIndex >= _items.length) return;
+    final user = _items[rowIndex];
+    setState(
+      () => _items[rowIndex] = AdminUser(
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        verified: user.verified,
+        createdAt: user.createdAt,
+        credit: user.credit,
+        creditUsed: user.creditUsed,
+        active: v,
+      ),
+    );
+    () async {
+      try {
+        await _repo.updateUserActive(id: user.id, active: v);
+        if (!mounted) return;
+        final msg = v ? 'Đã kích hoạt user' : 'Đã vô hiệu hóa user';
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      msg,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _items[rowIndex] = user);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Cập nhật active thất bại: $e')));
+      }
+    }();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -183,6 +252,21 @@ class _AdminAccountsViewState extends State<AdminAccountsView> {
               data: _tableData,
               showSearch: false,
               showPagination: false,
+              cellMaxWidth: 160,
+              centerColumns: const {4},
+              cellBuilder: (rowIndex, colIndex, value) {
+                // Active switch column
+                if (colIndex == 4) {
+                  final isActive = (rowIndex >= 0 && rowIndex < _items.length)
+                      ? (_items[rowIndex].active ?? false)
+                      : false;
+                  return Switch.adaptive(
+                    value: isActive,
+                    onChanged: (v) => _toggleActive(rowIndex, v),
+                  );
+                }
+                return null;
+              },
               actionsBuilder: (row) => Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -193,9 +277,52 @@ class _AdminAccountsViewState extends State<AdminAccountsView> {
                   ),
                   const SizedBox(width: 4),
                   IconButton(
-                    tooltip: 'Khoá',
-                    icon: const Icon(Icons.block_outlined),
-                    onPressed: () {},
+                    tooltip: 'Xoá vĩnh viễn',
+                    icon: const Icon(Icons.delete_forever_outlined),
+                    onPressed: () async {
+                      final user = _items[row];
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text('Xoá tài khoản'),
+                          content: Text(
+                            'Bạn có chắc muốn xoá vĩnh viễn "${user.name}"?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Huỷ'),
+                            ),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Xoá'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm != true) return;
+                      try {
+                        setState(() => _loading = true);
+                        await _repo.hardDeleteUser(user.id);
+                        setState(() {
+                          _items.removeAt(row);
+                          _total = (_total - 1).clamp(0, 1 << 31);
+                        });
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Đã xoá tài khoản')),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Xoá thất bại: $e')),
+                          );
+                        }
+                      } finally {
+                        if (mounted) setState(() => _loading = false);
+                      }
+                    },
                   ),
                 ],
               ),

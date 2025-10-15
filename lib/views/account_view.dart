@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import '../controllers/auth_controller.dart';
 import '../services/auth_repository.dart';
+import '../widgets/top_toast.dart';
 
 class AccountView extends StatefulWidget {
   final AuthController auth;
-  const AccountView({super.key, required this.auth});
+
+  /// Optional notice to show (e.g., prompt to update phone)
+  final String? initialNotice;
+  const AccountView({super.key, required this.auth, this.initialNotice});
 
   @override
   State<AccountView> createState() => _AccountViewState();
@@ -30,6 +34,29 @@ class _AccountViewState extends State<AccountView> {
     super.initState();
     _prefillFromAuth();
     _loadProfile();
+    // Show initial notice after first frame if provided
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final msg = widget.initialNotice;
+      if (msg != null && msg.isNotEmpty && mounted) {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.clearMaterialBanners();
+        messenger.showMaterialBanner(
+          MaterialBanner(
+            content: Text(msg),
+            leading: const Icon(Icons.info_outline),
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.surface.withOpacity(.98),
+            actions: [
+              TextButton(
+                onPressed: () => messenger.hideCurrentMaterialBanner(),
+                child: const Text('Đóng'),
+              ),
+            ],
+          ),
+        );
+      }
+    });
   }
 
   void _prefillFromAuth() {
@@ -72,10 +99,17 @@ class _AccountViewState extends State<AccountView> {
       final uid = widget.auth.user?.id ?? '';
       await repo.updatePhoneById(userId: uid, phone: phone);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã lưu số điện thoại')),
-      );
-      Navigator.pop(context);
+      TopToast.success(context, 'Đã lưu số điện thoại');
+      // If this screen was opened from login (with initialNotice), it likely
+      // replaced the previous route, so popping would leave a black screen.
+      // In that case, go to Home. Otherwise, just pop back.
+      if ((widget.initialNotice ?? '').isNotEmpty) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacementNamed('/home');
+      } else {
+        if (!mounted) return;
+        Navigator.pop(context);
+      }
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -86,9 +120,7 @@ class _AccountViewState extends State<AccountView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tài khoản của bạn'),
-      ),
+      appBar: AppBar(title: const Text('Tài khoản của bạn')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 460),
@@ -103,11 +135,16 @@ class _AccountViewState extends State<AccountView> {
                   child: CircleAvatar(
                     radius: 44,
                     backgroundColor: const Color(0xFFEFF3F8),
-                    backgroundImage: (_avatarUrl != null && _avatarUrl!.isNotEmpty)
+                    backgroundImage:
+                        (_avatarUrl != null && _avatarUrl!.isNotEmpty)
                         ? NetworkImage(_avatarUrl!)
                         : null,
                     child: (_avatarUrl == null || _avatarUrl!.isEmpty)
-                        ? Icon(Icons.person, size: 44, color: Colors.grey.shade600)
+                        ? Icon(
+                            Icons.person,
+                            size: 44,
+                            color: Colors.grey.shade600,
+                          )
                         : null,
                   ),
                 ),
@@ -136,7 +173,10 @@ class _AccountViewState extends State<AccountView> {
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   ),
                 if (_loading)
                   const Padding(
@@ -151,7 +191,10 @@ class _AccountViewState extends State<AccountView> {
                         ? const SizedBox(
                             height: 18,
                             width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Text('Lưu lại'),
                   ),

@@ -1,3 +1,4 @@
+import '../widgets/top_toast.dart';
 import 'package:flutter/material.dart';
 
 import '../controllers/auth_controller.dart';
@@ -559,15 +560,11 @@ class _HistoryListWithDeleteState extends State<_HistoryListWithDelete> {
                           try {
                             await widget.history.deleteHistory(id);
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Đã xóa lịch sử')),
-                              );
+                              TopToast.success(context, 'Đã xóa lịch sử');
                             }
                           } catch (e) {
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Xóa thất bại: $e')),
-                              );
+                              TopToast.error(context, 'Xóa thất bại: $e');
                             }
                           } finally {
                             if (mounted) setState(() => _deleting.remove(id));

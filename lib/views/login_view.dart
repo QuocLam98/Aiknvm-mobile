@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/auth_controller.dart';
+import 'account_view.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 class LoginView extends StatefulWidget {
@@ -68,9 +69,24 @@ class _LoginViewState extends State<LoginView> {
                                   final ok = await auth.loginWithGoogle();
                                   if (!mounted) return;
                                   if (ok) {
-                                    Navigator.of(
-                                      context,
-                                    ).pushReplacementNamed('/home');
+                                    final phone = auth.user?.phone?.trim();
+                                    final shouldFillPhone =
+                                        phone == null || phone.isEmpty;
+                                    if (shouldFillPhone) {
+                                      Navigator.of(context).pushReplacement(
+                                        MaterialPageRoute(
+                                          builder: (_) => AccountView(
+                                            auth: auth,
+                                            initialNotice:
+                                                'Vui lòng cập nhật số điện thoại để hoàn tất tài khoản.',
+                                          ),
+                                        ),
+                                      );
+                                    } else {
+                                      Navigator.of(
+                                        context,
+                                      ).pushReplacementNamed('/home');
+                                    }
                                   }
                                 },
                           icon: SvgPicture.asset(

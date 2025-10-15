@@ -12,6 +12,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/drawer_key.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../widgets/top_toast.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -350,11 +351,7 @@ class _HistoryChatViewState extends State<HistoryChatView> {
                         onPressed: () async {
                           await Clipboard.setData(ClipboardData(text: m.text));
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Đã sao chép nội dung'),
-                              ),
-                            );
+                            TopToast.success(context, 'Đã sao chép nội dung');
                           }
                         },
                         icon: Icon(Icons.copy, color: fg, size: 16),
@@ -573,14 +570,10 @@ class _HistoryChatViewState extends State<HistoryChatView> {
       await file.writeAsBytes(resp.bodyBytes);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Đã tải xuống: ${file.path}')));
+      TopToast.success(context, 'Đã tải xuống: ${file.path}');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Tải xuống thất bại')));
+      TopToast.error(context, 'Tải xuống thất bại');
     }
   }
 
@@ -593,15 +586,11 @@ class _HistoryChatViewState extends State<HistoryChatView> {
       if (!ok) ok = await launchUrl(uri, mode: LaunchMode.inAppWebView);
       if (!ok) ok = await launchUrl(uri, mode: LaunchMode.platformDefault);
       if (!ok && mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Không mở được tệp.')));
+        TopToast.error(context, 'Không mở được tệp.');
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Không mở được tệp.')));
+        TopToast.error(context, 'Không mở được tệp.');
       }
     }
   }
@@ -692,7 +681,14 @@ class _HistoryChatViewState extends State<HistoryChatView> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Theme.of(context).dividerColor.withOpacity(.25),
+                ),
+              ),
               // Bottom row: rounded input + circular send
               Row(
                 children: [
@@ -707,11 +703,7 @@ class _HistoryChatViewState extends State<HistoryChatView> {
                           context,
                         ).colorScheme.surface.withOpacity(.8),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Theme.of(
-                            context,
-                          ).dividerColor.withOpacity(.25),
-                        ),
+                        // Removed border per request (no visible input border)
                       ),
                       child: TextField(
                         controller: _inputCtrl,
@@ -747,12 +739,9 @@ class _HistoryChatViewState extends State<HistoryChatView> {
                                   botId == null ||
                                   botId.isEmpty) {
                                 if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Thiếu user hoặc bot để chat',
-                                      ),
-                                    ),
+                                  TopToast.error(
+                                    context,
+                                    'Thiếu user hoặc bot để chat',
                                   );
                                 }
                                 return;
@@ -795,9 +784,7 @@ class _HistoryChatViewState extends State<HistoryChatView> {
                                 }
                               } catch (e) {
                                 if (!mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Gửi thất bại: $e')),
-                                );
+                                TopToast.error(context, 'Gửi thất bại: $e');
                               } finally {
                                 if (mounted) setState(() => _sending = false);
                               }

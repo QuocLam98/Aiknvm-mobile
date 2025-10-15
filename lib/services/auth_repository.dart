@@ -148,12 +148,16 @@ class AuthRepository {
         ? (data['user'] as Map).cast<String, dynamic>()
         : data;
 
+    final phoneRaw = (userJson['phone'] ?? userJson['phoneNumber'] ?? '')
+        .toString()
+        .trim();
     final user = AppUser(
       id: userJson['id'] as String? ?? '',
       email: userJson['email'] as String? ?? '',
       name: userJson['name'] as String? ?? '',
       avatarUrl: userJson['image'] as String? ?? '',
       role: userJson['role'] as String? ?? 'user',
+      phone: phoneRaw.isEmpty ? null : phoneRaw,
     );
 
     final expiresAt = DateTime.now().add(const Duration(hours: 6));

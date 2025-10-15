@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/top_toast.dart';
 
 /// Simple top-up/pricing screen that mirrors the provided design.
 /// Currently focuses on layout/UI. Hook up payment flow from the "Mua ngay" buttons later.
@@ -29,7 +30,7 @@ class TopUpView extends StatelessWidget {
               priceText: '50.000 vnd',
               bullets: [
                 'Hỏi – đáp mọi lĩnh vực như giáo dục, tâm lí, pháp lí, bệnh lí, y học, khoa học, công nghệ, tin học, giới tính, tình yêu, hôn nhân, gia đình.',
-                'Có thể gỡ được 30 câu hỏi với câu trả lời có độ chính xác cao.',
+                'Có thể gõ được 30 câu hỏi với câu trả lời có độ chính xác cao.',
               ],
             ),
             _PricingCard(
@@ -143,11 +144,7 @@ class _PricingCard extends StatelessWidget {
                 ),
                 onPressed: () {
                   // TODO: Hook payment flow. For now, show a placeholder.
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Chức năng thanh toán sẽ sớm có.'),
-                    ),
-                  );
+                  TopToast.show(context, 'Chức năng thanh toán sẽ sớm có.');
                 },
                 child: const Text('Mua ngay'),
               ),

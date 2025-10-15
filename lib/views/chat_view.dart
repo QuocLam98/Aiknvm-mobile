@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../widgets/top_toast.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
 
@@ -367,7 +368,14 @@ class _ChatViewState extends State<ChatView> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: Theme.of(context).dividerColor.withOpacity(.25),
+                    ),
+                  ),
                   // Bottom row: rounded text input + circular send
                   Row(
                     children: [
@@ -382,11 +390,7 @@ class _ChatViewState extends State<ChatView> {
                               context,
                             ).colorScheme.surface.withOpacity(.8),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Theme.of(
-                                context,
-                              ).dividerColor.withOpacity(.25),
-                            ),
+                            // Removed border per request (no visible input border)
                           ),
                           child: TextField(
                             controller: _inputCtrl,
@@ -652,11 +656,7 @@ class _ChatViewState extends State<ChatView> {
                         onPressed: () async {
                           await Clipboard.setData(ClipboardData(text: m.text));
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Đã sao chép nội dung'),
-                              ),
-                            );
+                            TopToast.success(context, 'Đã sao chép nội dung');
                           }
                         },
                         icon: Icon(Icons.copy, color: fg, size: 16),
@@ -909,14 +909,10 @@ class _ChatViewState extends State<ChatView> {
       await file.writeAsBytes(resp.bodyBytes);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Đã tải xuống: ${file.path}')));
+      TopToast.success(context, 'Đã tải xuống: ${file.path}');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Tải xuống thất bại')));
+      TopToast.error(context, 'Tải xuống thất bại');
     }
   }
 }

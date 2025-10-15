@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'admin_table_scaffold.dart';
 import '../services/admin_repository.dart';
 import '../models/admin_user.dart';
+import '../widgets/top_toast.dart';
 
 class AdminAccountsView extends StatefulWidget {
   const AdminAccountsView({super.key});
@@ -104,9 +105,7 @@ class _AdminAccountsViewState extends State<AdminAccountsView> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Cập nhật thất bại: $e')));
+        TopToast.error(context, 'Cập nhật thất bại: $e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -148,39 +147,11 @@ class _AdminAccountsViewState extends State<AdminAccountsView> {
         await _repo.updateUserActive(id: user.id, active: v);
         if (!mounted) return;
         final msg = v ? 'Đã kích hoạt user' : 'Đã vô hiệu hóa user';
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      msg,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              duration: const Duration(seconds: 2),
-            ),
-          );
+        TopToast.success(context, msg);
       } catch (e) {
         if (!mounted) return;
         setState(() => _items[rowIndex] = user);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Cập nhật active thất bại: $e')));
+        TopToast.error(context, 'Cập nhật active thất bại: $e');
       }
     }();
   }
@@ -309,15 +280,11 @@ class _AdminAccountsViewState extends State<AdminAccountsView> {
                           _total = (_total - 1).clamp(0, 1 << 31);
                         });
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Đã xoá tài khoản')),
-                          );
+                          TopToast.success(context, 'Đã xoá tài khoản');
                         }
                       } catch (e) {
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Xoá thất bại: $e')),
-                          );
+                          TopToast.error(context, 'Xoá thất bại: $e');
                         }
                       } finally {
                         if (mounted) setState(() => _loading = false);

@@ -12,6 +12,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
+import '../widgets/top_toast.dart';
 
 class ChatImageView extends StatefulWidget {
   final AuthController auth;
@@ -379,9 +380,7 @@ class _ChatImageViewState extends State<ChatImageView> {
     final userId = widget.auth.user?.id;
     final botId = widget.home.bot?.id;
     if (userId == null || userId.isEmpty || botId == null || botId.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Thiếu user hoặc bot')));
+      TopToast.error(context, 'Thiếu user hoặc bot');
       return;
     }
     setState(() => _sending = true);
@@ -453,9 +452,7 @@ class _ChatImageViewState extends State<ChatImageView> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Gửi thất bại: $e')));
+      TopToast.error(context, 'Gửi thất bại: $e');
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -617,14 +614,10 @@ class _ChatImageViewState extends State<ChatImageView> {
       final fileName = 'img_${DateTime.now().millisecondsSinceEpoch}.png';
       final file = await File('${dir.path}/$fileName').writeAsBytes(bytes);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã tải xuống: ${file.path.split('/').last}')),
-      );
+      TopToast.success(context, 'Đã tải xuống: ${file.path.split('/').last}');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Tải xuống thất bại: $e')));
+      TopToast.error(context, 'Tải xuống thất bại: $e');
     }
   }
 }

@@ -7,6 +7,7 @@ import '../models/bot_model.dart';
 import '../services/bot_repository.dart';
 import 'admin_table_scaffold.dart';
 import '../controllers/app_events.dart';
+import '../widgets/top_toast.dart';
 
 class AdminBotsView extends StatefulWidget {
   const AdminBotsView({super.key});
@@ -96,15 +97,11 @@ class _AdminBotsViewState extends State<AdminBotsView> {
       await _load();
       AppEvents.instance.notifyBotsChanged();
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Đã tạo bot "${created.name}"')));
+        TopToast.success(context, 'Đã tạo bot "${created.name}"');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Tạo bot thất bại: $e')));
+        TopToast.error(context, 'Tạo bot thất bại: $e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -147,15 +144,11 @@ class _AdminBotsViewState extends State<AdminBotsView> {
       await _load();
       AppEvents.instance.notifyBotsChanged();
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Đã cập nhật bot')));
+        TopToast.success(context, 'Đã cập nhật bot');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Cập nhật thất bại: $e')));
+        TopToast.error(context, 'Cập nhật thất bại: $e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -189,15 +182,11 @@ class _AdminBotsViewState extends State<AdminBotsView> {
       await _load();
       AppEvents.instance.notifyBotsChanged();
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Đã xoá "${bot.name}"')));
+        TopToast.success(context, 'Đã xoá "${bot.name}"');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Xoá thất bại: $e')));
+        TopToast.error(context, 'Xoá thất bại: $e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -747,9 +736,7 @@ class _EditBotDialogState extends State<_EditBotDialog> {
   void _onSave() {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Tên không được để trống')));
+      TopToast.error(context, 'Tên không được để trống');
       return;
     }
     Navigator.pop(

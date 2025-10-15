@@ -19,6 +19,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/drawer_key.dart';
 import '../services/chat_repository.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../widgets/top_toast.dart';
 
 class HomeView extends StatefulWidget {
   final AuthController auth;
@@ -96,9 +97,7 @@ class _HomeViewState extends State<HomeView>
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Không chọn được file: $e')));
+      TopToast.error(context, 'Không chọn được file: $e');
       return;
     }
     if (result == null || result.files.isEmpty) return;
@@ -106,9 +105,7 @@ class _HomeViewState extends State<HomeView>
     if (f.path == null) return;
     final mime = _inferSimpleMime(f.name);
     if (!_isAllowedMime(mime)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Loại file không hỗ trợ: ${f.name}')),
-      );
+      TopToast.error(context, 'Loại file không hỗ trợ: ${f.name}');
       return;
     }
     final att = _PendingAttachment(
@@ -137,9 +134,7 @@ class _HomeViewState extends State<HomeView>
         att.uploading = false;
         att.error = 'Upload lỗi';
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upload thất bại ${att.name}: $e')),
-      );
+      TopToast.error(context, 'Upload thất bại ${att.name}: $e');
     }
   }
 
@@ -219,9 +214,7 @@ class _HomeViewState extends State<HomeView>
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Tải lịch sử thất bại: $e')));
+      TopToast.error(context, 'Tải lịch sử thất bại: $e');
     }
   }
 
@@ -549,7 +542,14 @@ class _HomeViewState extends State<HomeView>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: Theme.of(context).dividerColor.withOpacity(.25),
+                    ),
+                  ),
                   // Bottom row: text field + send button
                   Row(
                     children: [
@@ -564,11 +564,7 @@ class _HomeViewState extends State<HomeView>
                               context,
                             ).colorScheme.surface.withOpacity(.8),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Theme.of(
-                                context,
-                              ).dividerColor.withOpacity(.25),
-                            ),
+                            // Removed border per request (no visible input border)
                           ),
                           child: TextField(
                             controller: _inputCtrl,
@@ -605,12 +601,9 @@ class _HomeViewState extends State<HomeView>
                                       userId.isEmpty ||
                                       botId == null ||
                                       botId.isEmpty) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Thiếu user hoặc bot để chat',
-                                        ),
-                                      ),
+                                    TopToast.error(
+                                      context,
+                                      'Thiếu user hoặc bot để chat',
                                     );
                                     return;
                                   }
@@ -630,12 +623,9 @@ class _HomeViewState extends State<HomeView>
                                     _clearAllAttachments();
                                   }
                                   if (_attachments.length > 1) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Chỉ gửi file đầu tiên (BE chỉ hỗ trợ 1 file).',
-                                        ),
-                                      ),
+                                    TopToast.show(
+                                      context,
+                                      'Chỉ gửi file đầu tiên (BE chỉ hỗ trợ 1 file).',
                                     );
                                   }
                                   // TODO(MULTI_FILE_BE_SUPPORT): When backend supports multiple files,
@@ -739,11 +729,7 @@ class _HomeViewState extends State<HomeView>
                                     }
                                   } catch (e) {
                                     if (!mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Gửi thất bại: $e'),
-                                      ),
-                                    );
+                                    TopToast.error(context, 'Gửi thất bại: $e');
                                     setState(
                                       () => _sending = false,
                                     ); // fail fast
@@ -1062,12 +1048,7 @@ class _HomeViewState extends State<HomeView>
                                   ClipboardData(text: m.text),
                                 );
                                 if (mounted) {
-                                  ScaffoldMessenger.of(
-                                    context,
-                                  ).hideCurrentSnackBar();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Đã copy')),
-                                  );
+                                  TopToast.success(context, 'Đã copy');
                                 }
                               },
                             ),
@@ -1096,12 +1077,9 @@ class _HomeViewState extends State<HomeView>
                                   } catch (e) {
                                     setState(() => _messageStatus.remove(m.id));
                                     if (mounted) {
-                                      ScaffoldMessenger.of(
+                                      TopToast.error(
                                         context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Like thất bại: $e'),
-                                        ),
+                                        'Like thất bại: $e',
                                       );
                                     }
                                   }
@@ -1131,12 +1109,9 @@ class _HomeViewState extends State<HomeView>
                                   } catch (e) {
                                     setState(() => _messageStatus.remove(m.id));
                                     if (mounted) {
-                                      ScaffoldMessenger.of(
+                                      TopToast.error(
                                         context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Dislike thất bại: $e'),
-                                        ),
+                                        'Dislike thất bại: $e',
                                       );
                                     }
                                   }
@@ -1436,9 +1411,7 @@ class _AttachmentBubble extends StatelessWidget {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Không mở được file')));
+      TopToast.error(context, 'Không mở được file');
     }
   }
 
@@ -1536,10 +1509,7 @@ class _UserCopyIcon extends StatelessWidget {
       onTap: () async {
         await Clipboard.setData(ClipboardData(text: text));
         if (context.mounted) {
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Đã copy')));
+          TopToast.success(context, 'Đã copy');
         }
       },
       borderRadius: BorderRadius.circular(14),

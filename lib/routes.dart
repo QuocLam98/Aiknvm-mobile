@@ -26,6 +26,7 @@ import 'views/admin_messages_view.dart';
 import 'views/admin_payments_view.dart';
 import 'views/admin_products_view.dart';
 import 'views/usage_view.dart';
+import 'views/topup_view.dart';
 
 Route<dynamic> onGenerateRoute(RouteSettings settings, AuthController auth) {
   switch (settings.name) {
@@ -71,6 +72,8 @@ Route<dynamic> onGenerateRoute(RouteSettings settings, AuthController auth) {
     case '/payment':
       // Đã bỏ PaymentView; tạm thời điều hướng về UsageView hoặc trang chủ.
       return MaterialPageRoute(builder: (_) => UsageView(auth: auth));
+    case '/topup':
+      return MaterialPageRoute(builder: (_) => const TopUpView());
 
     // Chat by botId (nullable)
     case '/chat':

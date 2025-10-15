@@ -95,7 +95,9 @@ class AppDrawer extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                             onPressed: () {
-                              // TODO: điều hướng nạp tiền
+                              _popThen(() {
+                                Navigator.pushNamed(context, '/topup');
+                              });
                             },
                             child: const Text(
                               'Nạp tiền',

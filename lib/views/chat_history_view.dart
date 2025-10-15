@@ -15,6 +15,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import '../services/chat_repository.dart';
 import 'dart:io';
 
 class HistoryChatView extends StatefulWidget {
@@ -43,6 +44,7 @@ class _HistoryChatViewState extends State<HistoryChatView> {
   final _scroll = ScrollController();
   final _inputCtrl = TextEditingController();
   String? _selectedModel; // dropdown selection
+  bool _sending = false;
 
   BotModel? _bot;
   String? _botErr;
@@ -732,14 +734,81 @@ class _HistoryChatViewState extends State<HistoryChatView> {
                         shape: const CircleBorder(),
                         padding: EdgeInsets.zero,
                       ),
-                      onPressed: () {
-                        FocusScope.of(context).unfocus();
-                        // NOTE: When sending from history, use selected model to branch API
-                        // final model = _selectedModel ?? (_availableModelsFor(widget.home.bot).isNotEmpty ? _availableModelsFor(widget.home.bot).first['value'] : null);
-                        // final isGemini = (model ?? '').startsWith('gemini');
-                        // call isGemini ? createMessageMobileGemini(...) : createMessageMobileGpt(...), always include model
-                      },
-                      child: const Icon(Icons.send_rounded, size: 20),
+                      onPressed: _sending
+                          ? null
+                          : () async {
+                              FocusScope.of(context).unfocus();
+                              final text = _inputCtrl.text.trim();
+                              if (text.isEmpty) return;
+                              final userId = widget.auth.user?.id;
+                              final botId = (_bot ?? widget.home.bot)?.id;
+                              if (userId == null ||
+                                  userId.isEmpty ||
+                                  botId == null ||
+                                  botId.isEmpty) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Thiếu user hoặc bot để chat',
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
+                              setState(() => _sending = true);
+                              try {
+                                final repo = ChatRepository.fromEnv();
+                                final options = _availableModelsFor(
+                                  _bot ?? widget.home.bot,
+                                );
+                                final model =
+                                    _selectedModel ??
+                                    (options.isNotEmpty
+                                        ? options.first['value']
+                                        : null);
+                                final isGemini = (model ?? '').startsWith(
+                                  'gemini',
+                                );
+                                await (isGemini
+                                    ? repo.createMessageMobileGemini(
+                                        userId: userId,
+                                        botId: botId,
+                                        content: text,
+                                        historyChat: widget.historyId,
+                                        model: model,
+                                      )
+                                    : repo.createMessageMobileGpt(
+                                        userId: userId,
+                                        botId: botId,
+                                        content: text,
+                                        historyChat: widget.historyId,
+                                        model: model,
+                                      ));
+                                if (!mounted) return;
+                                _inputCtrl.clear();
+                                await widget.ctrl.refresh();
+                                // Với reverse: true, scroll về cuối là pixels=0
+                                if (_scroll.hasClients) {
+                                  _scroll.jumpTo(0);
+                                }
+                              } catch (e) {
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Gửi thất bại: $e')),
+                                );
+                              } finally {
+                                if (mounted) setState(() => _sending = false);
+                              }
+                            },
+                      child: _sending
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send_rounded, size: 20),
                     ),
                   ),
                 ],
@@ -753,7 +822,7 @@ class _HistoryChatViewState extends State<HistoryChatView> {
 
   // ===== Model dropdown helpers =====
   Widget _buildModelDropdown() {
-    final options = _availableModelsFor(widget.home.bot);
+    final options = _availableModelsFor(_bot ?? widget.home.bot);
     final current = _selectedModel;
     final contains = options.any((o) => o['value'] == current);
     final value = contains

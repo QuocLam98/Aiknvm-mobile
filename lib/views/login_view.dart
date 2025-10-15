@@ -34,7 +34,7 @@ class _LoginViewState extends State<LoginView> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Image.network(
-                        'https://aiknvm.vn/assets/logo-BrHqVm1P.png',
+                        'https://aiknvm.hn.ss.bfcplatform.vn/aiknvm/Asset/logo.png',
                         width: 64,
                         height: 64,
                         fit: BoxFit.contain,
@@ -45,6 +45,7 @@ class _LoginViewState extends State<LoginView> {
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w600,
+                          color: Colors.teal,
                         ),
                       ),
                       const SizedBox(height: 8),

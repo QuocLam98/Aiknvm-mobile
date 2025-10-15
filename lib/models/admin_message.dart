@@ -5,6 +5,7 @@ class AdminMessage {
   final String contentBot;
   final double creditCost;
   final DateTime? createdAt;
+  final String? models;
 
   const AdminMessage({
     required this.userName,
@@ -13,6 +14,7 @@ class AdminMessage {
     required this.contentBot,
     required this.creditCost,
     this.createdAt,
+    this.models,
   });
 
   factory AdminMessage.fromJson(Map<String, dynamic> json) {
@@ -48,6 +50,16 @@ class AdminMessage {
       createdAt = DateTime.tryParse(rawCreated);
     }
 
+    // Model (BE trả về 'models' hoặc đôi khi 'model'), có thể null/rỗng
+    String? model;
+    final rawModel = json['model'];
+    final rawModels = json['models'];
+    if (rawModel is String && rawModel.trim().isNotEmpty) {
+      model = rawModel.trim();
+    } else if (rawModels is String && rawModels.trim().isNotEmpty) {
+      model = rawModels.trim();
+    }
+
     return AdminMessage(
       userName: userName,
       botName: botName,
@@ -55,6 +67,7 @@ class AdminMessage {
       contentBot: contentBot,
       creditCost: creditCost,
       createdAt: createdAt,
+      models: model,
     );
   }
 }

@@ -16,6 +16,7 @@ class _AdminMessagesViewState extends State<AdminMessagesView> {
   final _columns = const [
     'Người dùng',
     'Bot',
+    'Mô hình',
     'User nói',
     'Bot trả lời',
     'Credit dùng',
@@ -70,6 +71,7 @@ class _AdminMessagesViewState extends State<AdminMessagesView> {
         (m) => [
           m.userName,
           m.botName,
+          (m.models ?? ''),
           m.contentUser,
           m.contentBot,
           _fmtCredit(m.creditCost),

@@ -76,6 +76,8 @@ class BotRepository {
     required String templateMessage,
     String? description,
     int? status, // 0=Hoạt động, 1=Bảo trì
+    String? priority,
+    String? models,
     List<int>? imageBytes,
     String? imageFilename,
   }) async {
@@ -88,6 +90,12 @@ class BotRepository {
     }
     if (status != null) {
       req.fields['status'] = status.toString();
+    }
+    if (priority != null && priority.isNotEmpty) {
+      req.fields['priority'] = priority; // string
+    }
+    if (models != null && models.isNotEmpty) {
+      req.fields['models'] = models; // string: 1,2,3
     }
     if (imageBytes != null && imageBytes.isNotEmpty) {
       final filename =
@@ -119,6 +127,8 @@ class BotRepository {
     String? templateMessage,
     String? description,
     int? status, // 0=Hoạt động, 1=Bảo trì
+    String? priority,
+    String? models,
     List<int>? imageBytes,
     String? imageFilename,
   }) async {
@@ -129,6 +139,12 @@ class BotRepository {
       req.fields['templateMessage'] = templateMessage;
     if (description != null) req.fields['description'] = description;
     if (status != null) req.fields['status'] = status.toString();
+    if (priority != null && priority.isNotEmpty) {
+      req.fields['priority'] = priority;
+    }
+    if (models != null && models.isNotEmpty) {
+      req.fields['models'] = models;
+    }
     if (imageBytes != null && imageBytes.isNotEmpty) {
       final filename =
           imageFilename ??

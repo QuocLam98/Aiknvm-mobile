@@ -85,6 +85,8 @@ class _AdminBotsViewState extends State<AdminBotsView> {
         templateMessage: res.template,
         description: res.description.isNotEmpty ? res.description : null,
         status: res.status,
+        priority: res.priority?.toString(),
+        models: res.models?.toString(),
         imageBytes: res.imageBytes?.toList(),
         imageFilename: res.imageUrl != null && res.imageUrl!.isNotEmpty
             ? res.imageUrl!.split('/').last
@@ -120,6 +122,8 @@ class _AdminBotsViewState extends State<AdminBotsView> {
           description: cur.description,
           template: cur.template,
           status: cur.status,
+          priority: cur.priority,
+          models: cur.models,
           imageUrl: cur.image,
         ),
       ),
@@ -133,6 +137,8 @@ class _AdminBotsViewState extends State<AdminBotsView> {
         templateMessage: res.template,
         description: res.description,
         status: res.status,
+        priority: res.priority?.toString(),
+        models: res.models?.toString(),
         imageBytes: res.imageBytes?.toList(),
         imageFilename: res.imageUrl != null && res.imageUrl!.isNotEmpty
             ? res.imageUrl!.split('/').last
@@ -400,6 +406,8 @@ class _BotFormResult {
   final String description;
   final String template;
   final int status; // 0 = Hoạt động, 1 = Bảo trì
+  final int? priority; // pri/priority (string số bên BE)
+  final int? models; // 1=Gemini, 2=GPT, 3=Gemini+GPT
   final String? imageUrl;
   final Uint8List? imageBytes;
 
@@ -408,6 +416,8 @@ class _BotFormResult {
     required this.description,
     required this.template,
     required this.status,
+    this.priority,
+    this.models,
     this.imageUrl,
     this.imageBytes,
   });
@@ -426,6 +436,8 @@ class _EditBotDialogState extends State<_EditBotDialog> {
   late final TextEditingController _descCtrl;
   late final TextEditingController _tplCtrl;
   int _status = 0; // 0=Hoạt động, 1=Bảo trì
+  int? _priority;
+  int? _models; // 1=Gemini, 2=GPT, 3=Gemini+GPT
   Uint8List? _imageBytes;
   String? _imageUrl;
 
@@ -438,6 +450,8 @@ class _EditBotDialogState extends State<_EditBotDialog> {
     _status = widget.initial?.status ?? 0;
     _imageUrl = widget.initial?.imageUrl;
     _imageBytes = widget.initial?.imageBytes;
+    _priority = widget.initial?.priority;
+    _models = widget.initial?.models;
   }
 
   @override
@@ -494,6 +508,14 @@ class _EditBotDialogState extends State<_EditBotDialog> {
                                 ),
                                 const SizedBox(height: 12),
                                 Row(
+                                  children: [
+                                    Expanded(child: _priorityField()),
+                                    const SizedBox(width: 16),
+                                    Expanded(child: _modelsField()),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Expanded(
@@ -527,6 +549,10 @@ class _EditBotDialogState extends State<_EditBotDialog> {
                           _field('Tên', _nameCtrl),
                           const SizedBox(height: 12),
                           _statusField(),
+                          const SizedBox(height: 12),
+                          _priorityField(),
+                          const SizedBox(height: 12),
+                          _modelsField(),
                           const SizedBox(height: 12),
                           _multiline('Mô tả', _descCtrl, minLines: minLines),
                           const SizedBox(height: 12),
@@ -733,9 +759,66 @@ class _EditBotDialogState extends State<_EditBotDialog> {
         description: _descCtrl.text.trim(),
         template: _tplCtrl.text.trim(),
         status: _status,
+        priority: _priority,
+        models: _models ?? 1,
         imageUrl: _imageUrl,
         imageBytes: _imageBytes,
       ),
+    );
+  }
+
+  Widget _priorityField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(bottom: 6),
+          child: Text('Ưu tiên', style: TextStyle(fontWeight: FontWeight.w600)),
+        ),
+        TextFormField(
+          initialValue: _priority?.toString() ?? '',
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
+          ),
+          onChanged: (v) {
+            final n = int.tryParse(v.trim());
+            setState(() => _priority = n);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _modelsField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(bottom: 6),
+          child: Text('Mô hình', style: TextStyle(fontWeight: FontWeight.w600)),
+        ),
+        DropdownButtonFormField<int>(
+          value: _models,
+          items: const [
+            DropdownMenuItem(value: 1, child: Text('Gemini')),
+            DropdownMenuItem(value: 2, child: Text('GPT')),
+            DropdownMenuItem(value: 3, child: Text('Gemini + GPT')),
+          ],
+          onChanged: (v) => setState(() => _models = v),
+          decoration: InputDecoration(
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 8,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -40,6 +40,7 @@ class _ChatViewState extends State<ChatView> {
   final ScrollController _listCtrl = ScrollController();
   final List<ChatMessageModel> _messages = [];
   bool _sending = false;
+  String? _selectedModel; // dropdown selection
 
   String _shortName(String name) {
     final t = name.trim();
@@ -323,135 +324,190 @@ class _ChatViewState extends State<ChatView> {
               ),
               child: Row(
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _inputCtrl,
-                      minLines: 1,
-                      maxLines: 4,
-                      scrollPadding: const EdgeInsets.only(bottom: 120),
-                      decoration: const InputDecoration(
-                        hintText: 'please chat here...',
-                        border: InputBorder.none,
-                      ),
-                    ),
-                  ),
-                  // Ảnh
-                  IconButton(
-                    tooltip: 'Ảnh',
-                    onPressed: () async {
-                      final result = await FilePicker.platform.pickFiles(
-                        type: FileType.custom,
-                        allowedExtensions: [
-                          'png',
-                          'jpg',
-                          'jpeg',
-                          'webp',
-                          'gif',
-                        ],
-                      );
-                      if (result != null && result.files.isNotEmpty) {
-                        final f = result.files.first;
-                        debugPrint('Ảnh được chọn: ${f.name} - ${f.path}');
-                        // TODO: upload/gửi file ảnh
-                      }
-                    },
-                    icon: const Icon(Icons.image_outlined),
-                  ),
-                  // Tài liệu
-                  IconButton(
-                    tooltip: 'Tài liệu',
-                    onPressed: () async {
-                      final result = await FilePicker.platform.pickFiles(
-                        type: FileType.custom,
-                        allowedExtensions: ['pdf', 'txt', 'doc', 'docx'],
-                      );
-                      if (result != null && result.files.isNotEmpty) {
-                        final f = result.files.first;
-                        debugPrint('Tài liệu được chọn: ${f.name} - ${f.path}');
-                        // TODO: upload/gửi file tài liệu
-                      }
-                    },
-                    icon: const Icon(Icons.description_outlined),
-                  ),
-                  const SizedBox(width: 4),
-                  FilledButton(
-                    onPressed: () async {
-                      FocusScope.of(context).unfocus();
-                      final text = _inputCtrl.text.trim();
-                      if (text.isEmpty) return;
-                      final userId = widget.auth.user?.id;
-                      final botId = widget.home.bot?.id;
-                      if (userId == null ||
-                          botId == null ||
-                          userId.isEmpty ||
-                          botId.isEmpty)
-                        return;
-                      setState(() {
-                        _sending = true;
-                        _messages.add(
-                          ChatMessageModel(
-                            id: 'local_${DateTime.now().millisecondsSinceEpoch}_u',
-                            text: text,
-                            role: 'user',
-                            createdAt: DateTime.now(),
-                            botId: botId,
-                          ),
-                        );
-                      });
-                      _inputCtrl.clear();
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (_listCtrl.hasClients) {
-                          _listCtrl.jumpTo(_listCtrl.position.maxScrollExtent);
-                        }
-                      });
-                      try {
-                        final repo = ChatRepository.fromEnv();
-                        final res = await repo.createMessageMobile(
-                          userId: userId,
-                          botId: botId,
-                          content: text,
-                          historyChat: null,
-                        );
-                        if (!mounted) return;
-                        setState(() {
-                          _messages.add(
-                            ChatMessageModel(
-                              id: '${res.id}_b',
-                              text: res.contentBot,
-                              role: 'bot',
-                              createdAt: res.createdAt,
-                              botId: botId,
-                            ),
+                  // Top row: model selector + attachments
+                  Row(
+                    children: [
+                      _buildModelDropdown(),
+                      const Spacer(),
+                      IconButton(
+                        tooltip: 'Ảnh',
+                        onPressed: () async {
+                          final result = await FilePicker.platform.pickFiles(
+                            type: FileType.custom,
+                            allowedExtensions: [
+                              'png',
+                              'jpg',
+                              'jpeg',
+                              'webp',
+                              'gif',
+                            ],
                           );
-                        });
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (_listCtrl.hasClients) {
-                            _listCtrl.jumpTo(
-                              _listCtrl.position.maxScrollExtent,
+                          if (result != null && result.files.isNotEmpty) {
+                            final f = result.files.first;
+                            debugPrint('Ảnh được chọn: ${f.name} - ${f.path}');
+                          }
+                        },
+                        icon: const Icon(Icons.image_outlined),
+                      ),
+                      IconButton(
+                        tooltip: 'Tài liệu',
+                        onPressed: () async {
+                          final result = await FilePicker.platform.pickFiles(
+                            type: FileType.custom,
+                            allowedExtensions: ['pdf', 'txt', 'doc', 'docx'],
+                          );
+                          if (result != null && result.files.isNotEmpty) {
+                            final f = result.files.first;
+                            debugPrint(
+                              'Tài liệu được chọn: ${f.name} - ${f.path}',
                             );
                           }
-                        });
-                      } catch (_) {
-                        if (!mounted) return;
-                        setState(() => _sending = false);
-                      } finally {
-                        if (mounted) setState(() => _sending = false);
-                      }
-                    },
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
+                        },
+                        icon: const Icon(Icons.description_outlined),
                       ),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: _sending
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.send_rounded, size: 18),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Bottom row: rounded text input + circular send
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surface.withOpacity(.8),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Theme.of(
+                                context,
+                              ).dividerColor.withOpacity(.25),
+                            ),
+                          ),
+                          child: TextField(
+                            controller: _inputCtrl,
+                            minLines: 1,
+                            maxLines: 5,
+                            scrollPadding: const EdgeInsets.only(bottom: 120),
+                            decoration: const InputDecoration(
+                              hintText: 'Nhập tin nhắn...',
+                              isDense: true,
+                              border: InputBorder.none,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            shape: const CircleBorder(),
+                            padding: EdgeInsets.zero,
+                          ),
+                          onPressed: () async {
+                            FocusScope.of(context).unfocus();
+                            final text = _inputCtrl.text.trim();
+                            if (text.isEmpty) return;
+                            final userId = widget.auth.user?.id;
+                            final botId = widget.home.bot?.id;
+                            if (userId == null ||
+                                botId == null ||
+                                userId.isEmpty ||
+                                botId.isEmpty)
+                              return;
+                            setState(() {
+                              _sending = true;
+                              _messages.add(
+                                ChatMessageModel(
+                                  id: 'local_${DateTime.now().millisecondsSinceEpoch}_u',
+                                  text: text,
+                                  role: 'user',
+                                  createdAt: DateTime.now(),
+                                  botId: botId,
+                                ),
+                              );
+                            });
+                            _inputCtrl.clear();
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (_listCtrl.hasClients) {
+                                _listCtrl.jumpTo(
+                                  _listCtrl.position.maxScrollExtent,
+                                );
+                              }
+                            });
+                            try {
+                              final repo = ChatRepository.fromEnv();
+                              final model =
+                                  _selectedModel ??
+                                  (_availableModelsFor(
+                                        widget.home.bot,
+                                      ).isNotEmpty
+                                      ? _availableModelsFor(
+                                          widget.home.bot,
+                                        ).first['value']
+                                      : null);
+                              final isGemini = (model ?? '').startsWith(
+                                'gemini',
+                              );
+                              final res = isGemini
+                                  ? await repo.createMessageMobileGemini(
+                                      userId: userId,
+                                      botId: botId,
+                                      content: text,
+                                      historyChat: null,
+                                      model: model,
+                                    )
+                                  : await repo.createMessageMobileGpt(
+                                      userId: userId,
+                                      botId: botId,
+                                      content: text,
+                                      historyChat: null,
+                                      model: model,
+                                    );
+                              if (!mounted) return;
+                              setState(() {
+                                _messages.add(
+                                  ChatMessageModel(
+                                    id: '${res.id}_b',
+                                    text: res.contentBot,
+                                    role: 'bot',
+                                    createdAt: res.createdAt,
+                                    botId: botId,
+                                  ),
+                                );
+                              });
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (_listCtrl.hasClients) {
+                                  _listCtrl.jumpTo(
+                                    _listCtrl.position.maxScrollExtent,
+                                  );
+                                }
+                              });
+                            } catch (_) {
+                              if (!mounted) return;
+                              setState(() => _sending = false);
+                            } finally {
+                              if (mounted) setState(() => _sending = false);
+                            }
+                          },
+                          child: _sending
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.send_rounded, size: 20),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -460,6 +516,95 @@ class _ChatViewState extends State<ChatView> {
         ),
       ),
     );
+  }
+
+  // ===== Model dropdown helpers (compact) =====
+  Widget _buildModelDropdown() {
+    final options = _availableModelsFor(widget.home.bot);
+    final current = _selectedModel;
+    final contains = options.any((o) => o['value'] == current);
+    final value = contains
+        ? current
+        : (options.isNotEmpty ? options.first['value'] : null);
+    final label = options.firstWhere(
+      (o) => o['value'] == value,
+      orElse: () => (options.isNotEmpty
+          ? options.first
+          : const {'label': 'Model', 'value': ''}),
+    )['label'];
+
+    return InputChip(
+      label: Text(label ?? 'Model'),
+      avatar: const Icon(Icons.tune, size: 16),
+      onPressed: options.isEmpty
+          ? null
+          : () async {
+              final selected = await showModalBottomSheet<String>(
+                context: context,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                builder: (_) {
+                  return SafeArea(
+                    top: false,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 8),
+                        Container(
+                          height: 4,
+                          width: 36,
+                          decoration: BoxDecoration(
+                            color: Colors.black12,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ...options.map(
+                          (o) => ListTile(
+                            title: Text(o['label'] ?? ''),
+                            trailing: (o['value'] == value)
+                                ? const Icon(Icons.check, color: Colors.green)
+                                : null,
+                            onTap: () => Navigator.of(context).pop(o['value']),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  );
+                },
+              );
+              if (selected != null && selected != _selectedModel) {
+                setState(() => _selectedModel = selected);
+              }
+            },
+      visualDensity: VisualDensity.compact,
+      labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+    );
+  }
+
+  List<Map<String, String>> _availableModelsFor(BotModel? bot) {
+    const gemini = [
+      {'value': 'gemini-2.5-flash', 'label': 'Gemini Flash'},
+      {'value': 'gemini-2.5-pro', 'label': 'Gemini Pro'},
+    ];
+    const gpt = [
+      {'value': 'gpt-5', 'label': 'GPT-5'},
+      {'value': 'gpt-5-mini', 'label': 'GPT-5 mini'},
+    ];
+    final type = (bot?.models)?.toString();
+    switch (type) {
+      case '1':
+        return gemini;
+      case '2':
+        return gpt;
+      case '3':
+        return [...gemini, ...gpt];
+      default:
+        return gemini;
+    }
   }
 
   // ---------- Bubble helpers (dùng khi render messages) ----------

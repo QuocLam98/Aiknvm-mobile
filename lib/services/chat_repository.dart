@@ -112,21 +112,53 @@ class ChatRepository {
     String? file,
     String? fileType,
     String? historyChat,
+    String? model,
   }) async {
-    final uri = Uri.parse('$baseUrl/create-message-mobile-gemini');
-    // Build body map explicitly so we can log and verify values before sending.
+    // Backward-compatible: route by model if provided, else default to GPT
+    final m = (model ?? '').trim();
+    if (m.startsWith('gemini')) {
+      return createMessageMobileGemini(
+        userId: userId,
+        botId: botId,
+        content: content,
+        file: file,
+        fileType: fileType,
+        historyChat: historyChat,
+        model: model,
+      );
+    }
+    return createMessageMobileGpt(
+      userId: userId,
+      botId: botId,
+      content: content,
+      file: file,
+      fileType: fileType,
+      historyChat: historyChat,
+      model: model,
+    );
+  }
+
+  Future<CreateMessageResult> createMessageMobileGpt({
+    required String userId,
+    required String botId,
+    required String content,
+    String? file,
+    String? fileType,
+    String? historyChat,
+    String? model,
+  }) async {
+    final uri = Uri.parse('$baseUrl/create-message-mobile');
     final bodyMap = <String, dynamic>{
       'id': userId,
       'bot': botId,
       'content': content,
     };
-    // Only include optional fields when they have a non-empty value
     if (file != null && file.isNotEmpty) bodyMap['file'] = file;
     if (fileType != null && fileType.isNotEmpty) bodyMap['fileType'] = fileType;
     if (historyChat != null && historyChat.isNotEmpty) {
       bodyMap['historyChat'] = historyChat;
     }
-    // ignore: avoid_print
+    if (model != null && model.isNotEmpty) bodyMap['model'] = model;
     final resp = await _client.post(
       uri,
       headers: {'Content-Type': 'application/json'},
@@ -139,17 +171,44 @@ class ChatRepository {
     }
     final decodedRaw = jsonDecode(resp.body);
     if (decodedRaw is Map<String, dynamic>) {
-      // API may only return a message on error; detect lack of data fields
-      final hasId =
-          decodedRaw.containsKey('_id') || decodedRaw.containsKey('id');
-      final hasHistory = decodedRaw.containsKey('history');
-      final hasData = decodedRaw.containsKey('data');
-      if (!hasId &&
-          !hasHistory &&
-          decodedRaw.containsKey('message') &&
-          !hasData) {
-        throw Exception(decodedRaw['message']?.toString() ?? 'API error');
-      }
+      return CreateMessageResult.fromJson(decodedRaw);
+    }
+    throw Exception('Unexpected response: ${resp.body}');
+  }
+
+  Future<CreateMessageResult> createMessageMobileGemini({
+    required String userId,
+    required String botId,
+    required String content,
+    String? file,
+    String? fileType,
+    String? historyChat,
+    String? model,
+  }) async {
+    final uri = Uri.parse('$baseUrl/create-message-mobile-gemini');
+    final bodyMap = <String, dynamic>{
+      'id': userId,
+      'bot': botId,
+      'content': content,
+    };
+    if (file != null && file.isNotEmpty) bodyMap['file'] = file;
+    if (fileType != null && fileType.isNotEmpty) bodyMap['fileType'] = fileType;
+    if (historyChat != null && historyChat.isNotEmpty) {
+      bodyMap['historyChat'] = historyChat;
+    }
+    if (model != null && model.isNotEmpty) bodyMap['model'] = model;
+    final resp = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(bodyMap),
+    );
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception(
+        'POST $uri failed: ${resp.statusCode} ${resp.reasonPhrase}: ${resp.body}',
+      );
+    }
+    final decodedRaw = jsonDecode(resp.body);
+    if (decodedRaw is Map<String, dynamic>) {
       return CreateMessageResult.fromJson(decodedRaw);
     }
     throw Exception('Unexpected response: ${resp.body}');

@@ -218,10 +218,22 @@ class AppDrawer extends StatelessWidget {
                                     ?.trim();
                                 final listBots =
                                     (defaultId == null || defaultId.isEmpty)
-                                    ? bots
+                                    ? List<BotModel>.from(bots)
                                     : bots
                                           .where((b) => b.id != defaultId)
                                           .toList();
+
+                                // Sắp xếp theo priority (thấp -> cao).
+                                // Null priority đẩy xuống cuối cùng.
+                                listBots.sort((a, b) {
+                                  final pa = a.priority ?? 1 << 30;
+                                  final pb = b.priority ?? 1 << 30;
+                                  final cmp = pa.compareTo(pb); // asc
+                                  if (cmp != 0) return cmp;
+                                  return a.name.toLowerCase().compareTo(
+                                    b.name.toLowerCase(),
+                                  );
+                                });
 
                                 if (listBots.isEmpty) {
                                   return const Padding(

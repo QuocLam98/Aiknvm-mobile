@@ -42,6 +42,7 @@ class HistoryChatView extends StatefulWidget {
 class _HistoryChatViewState extends State<HistoryChatView> {
   final _scroll = ScrollController();
   final _inputCtrl = TextEditingController();
+  String? _selectedModel; // dropdown selection
 
   BotModel? _bot;
   String? _botErr;
@@ -648,68 +649,156 @@ class _HistoryChatViewState extends State<HistoryChatView> {
           ),
           child: Row(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _inputCtrl,
-                  minLines: 1,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    hintText: 'Nhập tin nhắn...',
-                    border: InputBorder.none,
+              // Top row: model selector + attachments
+              Row(
+                children: [
+                  _buildModelDropdown(),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Ảnh',
+                    onPressed: () async {
+                      final result = await FilePicker.platform.pickFiles(
+                        type: FileType.custom,
+                        allowedExtensions: [
+                          'png',
+                          'jpg',
+                          'jpeg',
+                          'webp',
+                          'gif',
+                        ],
+                      );
+                      if (result != null && result.files.isNotEmpty) {
+                        final f = result.files.first;
+                        debugPrint('Ảnh được chọn: ${f.name} - ${f.path}');
+                      }
+                    },
+                    icon: const Icon(Icons.image_outlined),
                   ),
-                ),
-              ),
-              // Ảnh
-              IconButton(
-                tooltip: 'Ảnh',
-                onPressed: () async {
-                  final result = await FilePicker.platform.pickFiles(
-                    type: FileType.custom,
-                    allowedExtensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'],
-                  );
-                  if (result != null && result.files.isNotEmpty) {
-                    final f = result.files.first;
-                    debugPrint('Ảnh được chọn: ${f.name} - ${f.path}');
-                    // TODO: upload/gửi file ảnh
-                  }
-                },
-                icon: const Icon(Icons.image_outlined),
-              ),
-              // Tài liệu
-              IconButton(
-                tooltip: 'Tài liệu',
-                onPressed: () async {
-                  final result = await FilePicker.platform.pickFiles(
-                    type: FileType.custom,
-                    allowedExtensions: ['pdf', 'txt', 'doc', 'docx'],
-                  );
-                  if (result != null && result.files.isNotEmpty) {
-                    final f = result.files.first;
-                    debugPrint('Tài liệu được chọn: ${f.name} - ${f.path}');
-                    // TODO: upload/gửi file tài liệu
-                  }
-                },
-                icon: const Icon(Icons.description_outlined),
-              ),
-              FilledButton(
-                onPressed: () {
-                  FocusScope.of(context).unfocus();
-                  // TODO: gửi tin nhắn
-                },
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
+                  IconButton(
+                    tooltip: 'Tài liệu',
+                    onPressed: () async {
+                      final result = await FilePicker.platform.pickFiles(
+                        type: FileType.custom,
+                        allowedExtensions: ['pdf', 'txt', 'doc', 'docx'],
+                      );
+                      if (result != null && result.files.isNotEmpty) {
+                        final f = result.files.first;
+                        debugPrint('Tài liệu được chọn: ${f.name} - ${f.path}');
+                      }
+                    },
+                    icon: const Icon(Icons.description_outlined),
                   ),
-                  shape: const StadiumBorder(),
-                ),
-                child: const Icon(Icons.send_rounded, size: 18),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Bottom row: rounded input + circular send
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surface.withOpacity(.8),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Theme.of(
+                            context,
+                          ).dividerColor.withOpacity(.25),
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _inputCtrl,
+                        minLines: 1,
+                        maxLines: 5,
+                        decoration: const InputDecoration(
+                          hintText: 'Nhập tin nhắn...',
+                          isDense: true,
+                          border: InputBorder.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        shape: const CircleBorder(),
+                        padding: EdgeInsets.zero,
+                      ),
+                      onPressed: () {
+                        FocusScope.of(context).unfocus();
+                        // NOTE: When sending from history, use selected model to branch API
+                        // final model = _selectedModel ?? (_availableModelsFor(widget.home.bot).isNotEmpty ? _availableModelsFor(widget.home.bot).first['value'] : null);
+                        // final isGemini = (model ?? '').startsWith('gemini');
+                        // call isGemini ? createMessageMobileGemini(...) : createMessageMobileGpt(...), always include model
+                      },
+                      child: const Icon(Icons.send_rounded, size: 20),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  // ===== Model dropdown helpers =====
+  Widget _buildModelDropdown() {
+    final options = _availableModelsFor(widget.home.bot);
+    final current = _selectedModel;
+    final contains = options.any((o) => o['value'] == current);
+    final value = contains
+        ? current
+        : (options.isNotEmpty ? options.first['value'] : null);
+    return SizedBox(
+      width: 160,
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isDense: true,
+          value: value,
+          items: options
+              .map(
+                (o) => DropdownMenuItem<String>(
+                  value: o['value'],
+                  child: Text(o['label'] ?? ''),
+                ),
+              )
+              .toList(),
+          onChanged: (v) => setState(() => _selectedModel = v),
+        ),
+      ),
+    );
+  }
+
+  List<Map<String, String>> _availableModelsFor(BotModel? bot) {
+    const gemini = [
+      {'value': 'gemini-2.5-flash', 'label': 'Gemini Flash'},
+      {'value': 'gemini-2.5-pro', 'label': 'Gemini Pro'},
+    ];
+    const gpt = [
+      {'value': 'gpt-5', 'label': 'GPT-5'},
+      {'value': 'gpt-5-mini', 'label': 'GPT-5 mini'},
+    ];
+    final type = (bot?.models)?.toString();
+    switch (type) {
+      case '1':
+        return gemini;
+      case '2':
+        return gpt;
+      case '3':
+        return [...gemini, ...gpt];
+      default:
+        return gemini;
+    }
   }
 }
 

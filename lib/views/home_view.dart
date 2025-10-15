@@ -48,42 +48,38 @@ class _HomeViewState extends State<HomeView>
   final List<ChatMessageModel> _messages = [];
   final ScrollController _listCtrl = ScrollController();
   final TextEditingController _inputCtrl = TextEditingController();
+  String? _selectedModel; // dropdown selection for model
   String? _historyId;
   bool _sending = false;
 
   late final AnimationController _typingController;
   bool get _showTyping =>
       _sending && _messages.isNotEmpty && _messages.last.role == 'user';
-
-  // Streaming simulation state
-  bool _streaming = false;
-  String _streamFull = '';
-  Timer? _streamTimer;
-  // messageId (bot) -> status (1 like, 2 dislike)
-  final Map<String, int> _messageStatus = {};
-
-  // Attachment upload state
+  // Attachments & streaming state
   final List<_PendingAttachment> _attachments = [];
-
-  // Allowed MIME types
   static const Set<String> _allowedImageMimes = {
     'image/png',
     'image/jpeg',
-    'image/jpg', // some backends might send/expect this variant
     'image/webp',
     'image/gif',
   };
   static const Set<String> _allowedDocMimes = {
     'application/pdf',
-    'text/plain',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain',
   };
+  Map<String, int> _messageStatus = {};
+  Timer? _streamTimer;
+  String _streamFull = '';
+  bool _streaming = false;
 
   bool get _hasAttachment => _attachments.isNotEmpty;
   bool get _anyUploading => _attachments.any((a) => a.uploading);
 
   void _removeAttachment(String id) {
-    setState(() => _attachments.removeWhere((a) => a.id == id));
+    setState(() {
+      _attachments.removeWhere((a) => a.id == id);
+    });
   }
 
   void _clearAllAttachments() => setState(() => _attachments.clear());
@@ -532,20 +528,11 @@ class _HomeViewState extends State<HomeView>
                         itemCount: _attachments.length,
                       ),
                     ),
+                  // Top row: model selector + attach actions
                   Row(
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _inputCtrl,
-                          minLines: 1,
-                          maxLines: 4,
-                          scrollPadding: const EdgeInsets.only(bottom: 120),
-                          decoration: const InputDecoration(
-                            hintText: 'please chat here...',
-                            border: InputBorder.none,
-                          ),
-                        ),
-                      ),
+                      _buildModelSelectorChip(context),
+                      const Spacer(),
                       IconButton(
                         tooltip: 'Ảnh',
                         onPressed: _anyUploading
@@ -560,154 +547,221 @@ class _HomeViewState extends State<HomeView>
                             : () => _pickAndUploadSingle(image: false),
                         icon: const Icon(Icons.description_outlined),
                       ),
-                      FilledButton(
-                        onPressed: (_sending || _anyUploading)
-                            ? null
-                            : () async {
-                                FocusScope.of(context).unfocus();
-                                final text = _inputCtrl.text.trim();
-                                if (text.isEmpty) return;
-                                _inputCtrl.clear();
-                                final userId = widget.auth.user?.id;
-                                final botId = widget.home.bot?.id;
-                                if (userId == null ||
-                                    userId.isEmpty ||
-                                    botId == null ||
-                                    botId.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Thiếu user hoặc bot để chat',
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Bottom row: text field + send button
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surface.withOpacity(.8),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Theme.of(
+                                context,
+                              ).dividerColor.withOpacity(.25),
+                            ),
+                          ),
+                          child: TextField(
+                            controller: _inputCtrl,
+                            minLines: 1,
+                            maxLines: 5,
+                            scrollPadding: const EdgeInsets.only(bottom: 120),
+                            decoration: const InputDecoration(
+                              hintText: 'Nhập tin nhắn...',
+                              isDense: true,
+                              border: InputBorder.none,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            shape: const CircleBorder(),
+                            padding: EdgeInsets.zero,
+                          ),
+                          onPressed: (_sending || _anyUploading)
+                              ? null
+                              : () async {
+                                  FocusScope.of(context).unfocus();
+                                  final text = _inputCtrl.text.trim();
+                                  if (text.isEmpty) return;
+                                  _inputCtrl.clear();
+                                  final userId = widget.auth.user?.id;
+                                  final botId = widget.home.bot?.id;
+                                  if (userId == null ||
+                                      userId.isEmpty ||
+                                      botId == null ||
+                                      botId.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Thiếu user hoặc bot để chat',
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                  return;
-                                }
-                                setState(() => _sending = true);
-                                // choose first fully uploaded attachment (backend supports single file)
-                                _PendingAttachment? ready;
-                                for (final a in _attachments) {
-                                  if (a.url != null) {
-                                    ready = a;
-                                    break;
+                                    );
+                                    return;
                                   }
-                                }
-                                final attachedUrl = ready?.url;
-                                final attachedType = ready?.mime;
-                                // Clear preview immediately so it disappears once user presses send
-                                if (_attachments.isNotEmpty) {
-                                  _clearAllAttachments();
-                                }
-                                if (_attachments.length > 1) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Chỉ gửi file đầu tiên (BE chỉ hỗ trợ 1 file).',
-                                      ),
-                                    ),
-                                  );
-                                }
-                                // TODO(MULTI_FILE_BE_SUPPORT): When backend supports multiple files,
-                                // 1. Collect all uploaded attachment URLs: final urls = _attachments.where((a)=>a.url!=null).map((a)=>a.url).toList();
-                                // 2. Modify repository & API payload to accept array (e.g. files: [...]) and optional types.
-                                // 3. Update message model to store list and render gallery / file chips in _bubble.
-                                setState(() {
-                                  _messages.add(
-                                    ChatMessageModel(
-                                      id: 'local_${DateTime.now().millisecondsSinceEpoch}_u',
-                                      text: text,
-                                      role: 'user',
-                                      createdAt: DateTime.now(),
-                                      fileUrl: attachedUrl,
-                                      fileType: attachedType,
-                                    ),
-                                  );
-                                });
-                                try {
-                                  final forceFixedHistory =
-                                      widget.fixedHistoryId != null &&
-                                      widget.fixedHistoryId!.isNotEmpty;
-                                  final creatingNewHistory = forceFixedHistory
-                                      ? false
-                                      : (_historyId == null ||
-                                            _historyId!.isEmpty);
-                                  final repo = ChatRepository.fromEnv();
-                                  final res = await repo.createMessageMobile(
-                                    userId: userId,
-                                    botId: botId,
-                                    content: text,
-                                    historyChat: forceFixedHistory
-                                        ? widget.fixedHistoryId
-                                        : _historyId,
-                                    file: attachedUrl,
-                                    fileType: attachedType,
-                                  );
-                                  if (!mounted) return;
-                                  final beforeHistory = _historyId;
-                                  setState(() {
-                                    if (!forceFixedHistory) {
-                                      _historyId ??= res.history;
+                                  setState(() => _sending = true);
+                                  // choose first fully uploaded attachment (backend supports single file)
+                                  _PendingAttachment? ready;
+                                  for (final a in _attachments) {
+                                    if (a.url != null) {
+                                      ready = a;
+                                      break;
                                     }
+                                  }
+                                  final attachedUrl = ready?.url;
+                                  final attachedType = ready?.mime;
+                                  // Clear preview immediately so it disappears once user presses send
+                                  if (_attachments.isNotEmpty) {
+                                    _clearAllAttachments();
+                                  }
+                                  if (_attachments.length > 1) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Chỉ gửi file đầu tiên (BE chỉ hỗ trợ 1 file).',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  // TODO(MULTI_FILE_BE_SUPPORT): When backend supports multiple files,
+                                  // 1. Collect all uploaded attachment URLs: final urls = _attachments.where((a)=>a.url!=null).map((a)=>a.url).toList();
+                                  // 2. Modify repository & API payload to accept array (e.g. files: [...]) and optional types.
+                                  // 3. Update message model to store list and render gallery / file chips in _bubble.
+                                  setState(() {
+                                    _messages.add(
+                                      ChatMessageModel(
+                                        id: 'local_${DateTime.now().millisecondsSinceEpoch}_u',
+                                        text: text,
+                                        role: 'user',
+                                        createdAt: DateTime.now(),
+                                        fileUrl: attachedUrl,
+                                        fileType: attachedType,
+                                      ),
+                                    );
                                   });
-                                  // If this message just created a new history id, update the message record.
-                                  if (!forceFixedHistory) {
-                                    if ((beforeHistory == null ||
-                                            beforeHistory.isEmpty) &&
+                                  try {
+                                    final forceFixedHistory =
+                                        widget.fixedHistoryId != null &&
+                                        widget.fixedHistoryId!.isNotEmpty;
+                                    final creatingNewHistory = forceFixedHistory
+                                        ? false
+                                        : (_historyId == null ||
+                                              _historyId!.isEmpty);
+                                    final repo = ChatRepository.fromEnv();
+                                    final model =
+                                        _selectedModel ??
+                                        (_availableModelsFor(
+                                              widget.home.bot,
+                                            ).isNotEmpty
+                                            ? _availableModelsFor(
+                                                widget.home.bot,
+                                              ).first['value']
+                                            : null);
+                                    final isGemini = (model ?? '').startsWith(
+                                      'gemini',
+                                    );
+                                    final res = isGemini
+                                        ? await repo.createMessageMobileGemini(
+                                            userId: userId,
+                                            botId: botId,
+                                            content: text,
+                                            historyChat: forceFixedHistory
+                                                ? widget.fixedHistoryId
+                                                : _historyId,
+                                            file: attachedUrl,
+                                            fileType: attachedType,
+                                            model: model,
+                                          )
+                                        : await repo.createMessageMobileGpt(
+                                            userId: userId,
+                                            botId: botId,
+                                            content: text,
+                                            historyChat: forceFixedHistory
+                                                ? widget.fixedHistoryId
+                                                : _historyId,
+                                            file: attachedUrl,
+                                            fileType: attachedType,
+                                            model: model,
+                                          );
+                                    if (!mounted) return;
+                                    final beforeHistory = _historyId;
+                                    setState(() {
+                                      if (!forceFixedHistory) {
+                                        _historyId ??= res.history;
+                                      }
+                                    });
+                                    // If this message just created a new history id, update the message record.
+                                    if (!forceFixedHistory) {
+                                      if ((beforeHistory == null ||
+                                              beforeHistory.isEmpty) &&
+                                          _historyId != null &&
+                                          _historyId!.isNotEmpty) {
+                                        try {
+                                          await repo.updateMessageHistory(
+                                            messageId: res.id,
+                                            historyId: _historyId!,
+                                          );
+                                        } catch (_) {}
+                                      }
+                                    }
+                                    // Start streaming bot response
+                                    _startStreaming(
+                                      res.contentBot,
+                                      ChatMessageModel(
+                                        id: '${res.id}_b',
+                                        text: '',
+                                        role: 'bot',
+                                        createdAt: res.createdAt,
+                                        botId: botId,
+                                      ),
+                                    );
+                                    if (creatingNewHistory &&
                                         _historyId != null &&
                                         _historyId!.isNotEmpty) {
                                       try {
-                                        await repo.updateMessageHistory(
-                                          messageId: res.id,
-                                          historyId: _historyId!,
-                                        );
+                                        await widget.history.refreshHistory();
                                       } catch (_) {}
                                     }
+                                  } catch (e) {
+                                    if (!mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Gửi thất bại: $e'),
+                                      ),
+                                    );
+                                    setState(
+                                      () => _sending = false,
+                                    ); // fail fast
                                   }
-                                  // Start streaming bot response
-                                  _startStreaming(
-                                    res.contentBot,
-                                    ChatMessageModel(
-                                      id: '${res.id}_b',
-                                      text: '',
-                                      role: 'bot',
-                                      createdAt: res.createdAt,
-                                      botId: botId,
+                                },
+                          child: _sending
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation(
+                                      Colors.white,
                                     ),
-                                  );
-                                  if (creatingNewHistory &&
-                                      _historyId != null &&
-                                      _historyId!.isNotEmpty) {
-                                    try {
-                                      await widget.history.refreshHistory();
-                                    } catch (_) {}
-                                  }
-                                } catch (e) {
-                                  if (!mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Gửi thất bại: $e')),
-                                  );
-                                  setState(() => _sending = false); // fail fast
-                                }
-                              },
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
-                          ),
-                          shape: const StadiumBorder(),
-                        ),
-                        child: _sending
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation(
-                                    Colors.white,
                                   ),
-                                ),
-                              )
-                            : const Icon(Icons.send_rounded, size: 18),
+                                )
+                              : const Icon(Icons.send_rounded, size: 20),
+                        ),
                       ),
                     ],
                   ),
@@ -717,6 +771,97 @@ class _HomeViewState extends State<HomeView>
           ),
         ),
       ),
+    );
+  }
+
+  // (Dropdown version removed in favor of chip selector)
+
+  List<Map<String, String>> _availableModelsFor(BotModel? bot) {
+    const gemini = [
+      {'value': 'gemini-2.5-flash', 'label': 'Gemini Flash'},
+      {'value': 'gemini-2.5-pro', 'label': 'Gemini Pro'},
+    ];
+    const gpt = [
+      {'value': 'gpt-5', 'label': 'GPT-5'},
+      {'value': 'gpt-5-mini', 'label': 'GPT-5 mini'},
+    ];
+    final type = (bot?.models)?.toString();
+    switch (type) {
+      case '1':
+        return gemini;
+      case '2':
+        return gpt;
+      case '3':
+        return [...gemini, ...gpt];
+      default:
+        return gemini;
+    }
+  }
+
+  // Compact model selector chip with bottom-sheet options
+  Widget _buildModelSelectorChip(BuildContext context) {
+    final options = _availableModelsFor(widget.home.bot);
+    final current = _selectedModel;
+    final contains = options.any((o) => o['value'] == current);
+    final value = contains
+        ? current
+        : (options.isNotEmpty ? options.first['value'] : null);
+    final label = options.firstWhere(
+      (o) => o['value'] == value,
+      orElse: () => (options.isNotEmpty
+          ? options.first
+          : const {'label': 'Model', 'value': ''}),
+    )['label'];
+
+    return InputChip(
+      label: Text(label ?? 'Model'),
+      avatar: const Icon(Icons.tune, size: 16),
+      onPressed: options.isEmpty
+          ? null
+          : () async {
+              final selected = await showModalBottomSheet<String>(
+                context: context,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                builder: (_) {
+                  return SafeArea(
+                    top: false,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 8),
+                        Container(
+                          height: 4,
+                          width: 36,
+                          decoration: BoxDecoration(
+                            color: Colors.black12,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ...options.map(
+                          (o) => ListTile(
+                            title: Text(o['label'] ?? ''),
+                            trailing: (o['value'] == value)
+                                ? const Icon(Icons.check, color: Colors.green)
+                                : null,
+                            onTap: () => Navigator.of(context).pop(o['value']),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  );
+                },
+              );
+              if (selected != null && selected != _selectedModel) {
+                setState(() => _selectedModel = selected);
+              }
+            },
+      visualDensity: VisualDensity.compact,
+      labelStyle: const TextStyle(fontWeight: FontWeight.w600),
     );
   }
 

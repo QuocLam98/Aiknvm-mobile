@@ -591,12 +591,12 @@ class _ChatViewState extends State<ChatView> {
 
   List<Map<String, String>> _availableModelsFor(BotModel? bot) {
     const gemini = [
-      {'value': 'gemini-2.5-flash', 'label': 'Gemini Flash'},
-      {'value': 'gemini-2.5-pro', 'label': 'Gemini Pro'},
+      {'value': 'gemini-2.5-flash', 'label': 'Gemini Nhanh'},
+      {'value': 'gemini-2.5-pro', 'label': 'Gemini Sâu'},
     ];
     const gpt = [
-      {'value': 'gpt-5', 'label': 'GPT-5'},
-      {'value': 'gpt-5-mini', 'label': 'GPT-5 mini'},
+      {'value': 'gpt-5', 'label': 'Chatgpt (OpenAI) pro'},
+      {'value': 'gpt-5-mini', 'label': 'Chatgpt (OpenAI) mini'},
     ];
     final type = (bot?.models)?.toString();
     switch (type) {

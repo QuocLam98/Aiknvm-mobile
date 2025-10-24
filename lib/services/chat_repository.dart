@@ -263,7 +263,7 @@ class ChatRepository {
     String? historyChat,
     File? file,
   }) async {
-    final uri = Uri.parse('$baseUrl/create-message-image-pre-mobile');
+    final uri = Uri.parse('$baseUrl/create-message-image-pre-gemini-mobile');
     if (file != null) {
       final req = http.MultipartRequest('POST', uri);
       req.fields['id'] = userId;
